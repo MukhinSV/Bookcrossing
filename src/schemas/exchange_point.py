@@ -6,7 +6,7 @@ from src.schemas.organisation import Organisation
 class ExchangePoint(BaseModel):
     id: int
     organisation_id: int
-    location: str | None
+    address: str
     description: str | None
-    organisation: Organisation
+    organisation: Organisation | None = None
     model_config = ConfigDict(from_attributes=True)

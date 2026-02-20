@@ -4,7 +4,6 @@ from src.models.author import AuthorORM
 from src.models.book import BookORM
 from src.models.exchange_point import ExchangePointORM
 from src.models.instance import InstanceORM
-from src.models.organisation import OrganisationORM
 from src.schemas.book import Book
 from src.repositories.base import BaseRepository
 
@@ -43,7 +42,7 @@ class BookRepository(BaseRepository):
         if country:
             conditions.append(AuthorORM.country == country)
         if address:
-            conditions.append(OrganisationORM.address == address)
+            conditions.append(ExchangePointORM.address == address)
 
         query = (
             select(self.model)
@@ -56,7 +55,6 @@ class BookRepository(BaseRepository):
                 ),
             )
             .join(ExchangePointORM, ExchangePointORM.id == InstanceORM.exchange_point_id)
-            .join(OrganisationORM, OrganisationORM.id == ExchangePointORM.organisation_id)
         )
         count_query = (
             select(func.count(func.distinct(self.model.id)))
@@ -70,7 +68,6 @@ class BookRepository(BaseRepository):
                 ),
             )
             .join(ExchangePointORM, ExchangePointORM.id == InstanceORM.exchange_point_id)
-            .join(OrganisationORM, OrganisationORM.id == ExchangePointORM.organisation_id)
         )
 
         if conditions:
@@ -133,10 +130,10 @@ class BookRepository(BaseRepository):
             .order_by(AuthorORM.country.asc())
         )
         addresses_result = await self.session.execute(
-            select(OrganisationORM.address)
-            .where(OrganisationORM.address.is_not(None))
+            select(ExchangePointORM.address)
+            .where(ExchangePointORM.address.is_not(None))
             .distinct()
-            .order_by(OrganisationORM.address.asc())
+            .order_by(ExchangePointORM.address.asc())
         )
 
         return {

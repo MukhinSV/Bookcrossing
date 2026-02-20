@@ -63,6 +63,12 @@
       transform: translateY(-4px);
       box-shadow: 0 16px 24px rgba(7, 14, 12, 0.15);
     }
+    .news-section .row > [class*="col-"] {
+      margin-bottom: .55rem;
+    }
+    .shelf-section .row > [class*="col-"] {
+      margin-bottom: .55rem;
+    }
     .shelf-card::before {
       content: "";
       position: absolute;
@@ -73,6 +79,9 @@
     .news-card .card-body,
     .shelf-card .card-body {
       padding: 1.2rem 1.25rem;
+    }
+    .news-card h3 {
+      margin-bottom: 0;
     }
     .book-card { min-height: 260px; }
     .book-cover-frame {
@@ -155,7 +164,7 @@
         <div class="card-body">
           <p class="mb-0 special">
             Bookcrossing помогает находить книги рядом, брать их в оборот и делиться прочитанным.
-            Выбирайте книгу в каталоге, следите за очередями и находите ближайшие точки обмена.
+            Выбирайте книгу в каталоге и находите ближайшие точки обмена.
           </p>
         </div>
       </div>
@@ -195,7 +204,7 @@
             <div class="card-body">
               <span class="news-badge">Каталог</span>
               <h3 class="h6">Каталог обновляется ежедневно</h3>
-              <p class="mb-0">Пользователи добавляют новые книги каждый день. Следите за подборкой в слайдере.</p>
+              <p class="mb-0">Пользователи добавляют новые книги каждый день. Следите за подборкой.</p>
             </div>
           </article>
         </div>
@@ -204,7 +213,7 @@
             <div class="card-body">
               <span class="news-badge">Профиль</span>
               <h3 class="h6">Улучшен личный кабинет</h3>
-              <p class="mb-0">Теперь в профиле проще отслеживать свои книги, взятые экземпляры и очереди.</p>
+              <p class="mb-0">Теперь в профиле проще отслеживать свои книги, взятые экземпляры и бронирования.</p>
             </div>
           </article>
         </div>

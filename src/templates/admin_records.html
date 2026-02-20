@@ -236,7 +236,7 @@
         if (currentTable === "instance" && column.name === "exchange_point_id") {
           const options = exchangePointOptions.map((point) => {
             const organisationName = point.organisation?.name || `Организация #${point.organisation_id ?? "?"}`;
-            const address = point.organisation?.address ? ` (${point.organisation.address})` : "";
+            const address = point.address ? ` (${point.address})` : "";
             return `<option value="${point.id}">${organisationName}${address}</option>`;
           }).join("");
           return `

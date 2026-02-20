@@ -5,6 +5,7 @@ from sqlalchemy import or_, select, func
 from starlette.responses import HTMLResponse, FileResponse
 
 from src.dependencies.db_dep import DBDep
+from src.models.exchange_point import ExchangePointORM
 from src.models.organisation import OrganisationORM
 from src.services.user import AuthService
 
@@ -34,7 +35,16 @@ async def main_page(db: DBDep, request: Request):
         except Exception:
             user = None
     books = await db.book.get_all()
-    organisations = await db.organisation.get_all()
+    exchange_points = await db.exchange_point.get_all()
+    organisations = [
+        {
+            "id": point.id,
+            "name": point.organisation.name if point.organisation else "-",
+            "address": point.address,
+            "description": point.description,
+        }
+        for point in exchange_points
+    ]
     context = {"user": user, "books": books[:9], "organisations": organisations[:3]}
     return context
 
@@ -45,21 +55,37 @@ async def shelves_page(db: DBDep, q: str | None = None, page: int = 1):
     per_page = 10
     query = q.strip() if q else None
 
-    organisations_query = select(OrganisationORM).order_by(OrganisationORM.name.asc())
-    count_query = select(func.count(OrganisationORM.id))
+    organisations_query = (
+        select(ExchangePointORM, OrganisationORM)
+        .join(OrganisationORM, OrganisationORM.id == ExchangePointORM.organisation_id)
+        .order_by(OrganisationORM.name.asc(), ExchangePointORM.address.asc())
+    )
+    count_query = (
+        select(func.count(ExchangePointORM.id))
+        .select_from(ExchangePointORM)
+        .join(OrganisationORM, OrganisationORM.id == ExchangePointORM.organisation_id)
+    )
     if query:
         search_condition = or_(
             OrganisationORM.name.icontains(query),
-            OrganisationORM.address.icontains(query),
+            ExchangePointORM.address.icontains(query),
         )
         organisations_query = organisations_query.where(search_condition)
         count_query = count_query.where(search_condition)
 
     organisations_query = organisations_query.offset((page - 1) * per_page).limit(per_page)
 
-    result = await db.organisation.session.execute(organisations_query)
-    organisations = [db.organisation.schema.model_validate(item) for item in result.scalars().all()]
-    total = (await db.organisation.session.execute(count_query)).scalar_one()
+    result = await db.session.execute(organisations_query)
+    organisations = [
+        {
+            "id": point.id,
+            "name": organisation.name if organisation else "-",
+            "address": point.address,
+            "description": point.description or (organisation.description if organisation else None),
+        }
+        for point, organisation in result.all()
+    ]
+    total = (await db.session.execute(count_query)).scalar_one()
     total_pages = (total + per_page - 1) // per_page if total > 0 else 0
 
     return {

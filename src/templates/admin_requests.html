@@ -111,7 +111,7 @@
       requestsEmpty.classList.add("d-none");
 
       const exchangeOptions = exchangePoints.map((point) => `
-        <option value="${point.id}">${point.organisation?.address ?? "Адрес не указан"}</option>
+        <option value="${point.id}">${point.address ?? "Адрес не указан"}</option>
       `).join("");
 
       requestsList.innerHTML = items.map((item) => `

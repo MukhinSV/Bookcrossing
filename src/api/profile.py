@@ -175,7 +175,7 @@ async def profile_add_book(payload: PayloadDep, db: DBDep, data: ProfileAddBookR
         owner_id=payload["user_id"],
         title=title,
         author=author_fullname,
-        address=exchange_point.organisation.address if exchange_point.organisation else "",
+        address=exchange_point.address,
         created_at=datetime.now(timezone.utc),
     )
     await db.new_added_instance.add(new_added_instance)

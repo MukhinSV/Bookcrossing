@@ -187,13 +187,13 @@
       const points = Array.isArray(exchangePoints) ? exchangePoints : [];
       const sourcePoints = points.length ? points : instances.map((instance) => ({
         id: instance.exchange_point_id,
-        organisation: {address: "Адрес не указан"}
+        address: "Адрес не указан"
       }));
 
       sourcePoints.forEach((point) => {
         const option = document.createElement("option");
         option.value = String(point.id);
-        option.textContent = point.organisation?.address ?? "Адрес не указан";
+        option.textContent = point.address ?? "Адрес не указан";
         exchangeSelect.appendChild(option);
       });
 

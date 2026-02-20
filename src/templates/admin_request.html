@@ -77,7 +77,7 @@
           return;
         }
         const options = (metaData.exchange_points ?? []).map((point) => `
-          <option value="${point.id}">${point.organisation?.address ?? "Адрес не указан"}</option>
+          <option value="${point.id}">${point.address ?? "Адрес не указан"}</option>
         `).join("");
 
         requestBody.innerHTML = `

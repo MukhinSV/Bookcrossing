@@ -256,7 +256,7 @@
       rentBooksBody.innerHTML = items.map((item) => {
         const selectOptions = exchangePoints.map((point) => `
           <option value="${point.id}">
-            ${point.organisation?.address ?? "Адрес не указан"}
+            ${point.address ?? "Адрес не указан"}
           </option>
         `).join("");
 

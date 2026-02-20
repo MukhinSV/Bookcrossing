@@ -9,6 +9,6 @@ class ExchangePointORM(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     organisation_id: Mapped[int] = mapped_column(ForeignKey("organisation.id"))
-    location: Mapped[str | None]
+    address: Mapped[str]
     description: Mapped[str | None]
     organisation = relationship("OrganisationORM", lazy="selectin")

@@ -96,7 +96,7 @@
       items.forEach((point) => {
         const option = document.createElement("option");
         option.value = String(point.id);
-        option.textContent = point.organisation?.address ?? "Адрес не указан";
+        option.textContent = point.address ?? "Адрес не указан";
         exchangePointSelect.appendChild(option);
       });
     }
