@@ -9,10 +9,7 @@ class Settings(BaseSettings):
     DB_PORT: int
     DB_USER: str
     DB_PASS: str
-    DATABASE_URL = settings.DATABASE_URL.replace(
-        "postgresql://",
-        "postgresql+asyncpg://"
-    )
+    DATABASE_URL: str
 
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str
