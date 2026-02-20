@@ -9,13 +9,10 @@ class Settings(BaseSettings):
     DB_PORT: int
     DB_USER: str
     DB_PASS: str
-
-    @property
-    def DB_URL(self):
-        return f"postgresql+asyncpg://" \
-               f"{self.DB_USER}:{self.DB_PASS}" \
-               f"@{self.DB_HOST}:{self.DB_PORT}" \
-               f"/{self.DB_NAME}"
+    DATABASE_URL = settings.DATABASE_URL.replace(
+        "postgresql://",
+        "postgresql+asyncpg://"
+    )
 
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str
