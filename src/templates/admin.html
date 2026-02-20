@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Админ-панель</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <style>
+    body { min-height: 100vh; }
+    .site-footer {
+      background: var(--bg-solid);
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+    .site-footer .muted { color: var(--text-muted); }
+    .preview-list article:last-child { margin-bottom: 0 !important; }
+    .json-preview {
+      margin-top: .35rem;
+      padding: .5rem .6rem;
+      border: 1px solid var(--border);
+      border-radius: .65rem;
+      background: color-mix(in srgb, var(--surface-soft) 78%, transparent);
+      max-width: 100%;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .records-card-header {
+      align-items: center !important;
+      flex-wrap: nowrap;
+      justify-content: space-between;
+    }
+    .records-head-left {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      min-width: 0;
+      width: 100%;
+    }
+    .records-title {
+      white-space: nowrap;
+    }
+    .records-select-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      padding: .25rem .4rem;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--surface-soft) 72%, transparent);
+      max-width: 100%;
+    }
+    .records-select-label {
+      font-size: .74rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    #table-select {
+      width: 124px;
+      min-width: 124px;
+      padding: .28rem .42rem;
+      border-radius: 10px;
+      max-width: 100%;
+    }
+    #records-open-btn {
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    @media (max-width: 699.98px) {
+      .records-card-header {
+        flex-wrap: wrap;
+        align-items: flex-start !important;
+      }
+      .records-head-left {
+        gap: .45rem;
+      }
+      .records-title {
+        font-size: .98rem;
+      }
+      .records-select-wrap {
+        padding: .18rem .28rem;
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+      #table-select {
+        width: 100%;
+        min-width: 0;
+        padding: .22rem .34rem;
+      }
+      #records-open-btn {
+        order: 2;
+        margin-top: .35rem;
+        align-self: flex-start;
+        font-size: .72rem;
+        padding: .34rem .56rem;
+      }
+    }
+  </style>
+</head>
+<body class="bg-light d-flex flex-column">
+  <main class="container py-4 py-md-5 flex-grow-1">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+      <div>
+        <h1 class="h3 mb-1">Админ-панель</h1>
+        <a href="/admin/stats" class="small text-decoration-none">Статистика</a>
+      </div>
+      <div class="d-flex gap-2" data-mobile-menu>
+        <a href="/main/view" class="btn btn-outline-secondary">На главную</a>
+        <a href="/profile/view" class="btn btn-outline-secondary">Профиль</a>
+      </div>
+    </div>
+
+    <div id="result" class="mb-3" role="status"></div>
+
+    <section class="card shadow-sm mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center records-card-header">
+        <span class="fw-semibold">Заявки (превью: 3)</span>
+        <a href="/admin/requests/view" class="btn btn-sm btn-primary">Все заявки</a>
+      </div>
+      <div class="card-body">
+        <div id="requests-empty" class="alert alert-secondary d-none mb-0">Заявок нет</div>
+        <div id="requests-preview" class="preview-list vstack gap-2"></div>
+      </div>
+    </section>
+
+    <section class="card shadow-sm">
+      <div class="card-header d-flex records-card-header">
+        <div class="records-head-left">
+          <span class="fw-semibold records-title">Записи БД (превью: 3)</span>
+          <div class="records-select-wrap">
+            <span class="records-select-label">Таблица</span>
+            <select id="table-select" class="form-select form-select-sm"></select>
+          </div>
+        </div>
+        <a id="records-open-btn" href="/admin/records/view" class="btn btn-sm btn-primary">Все записи</a>
+      </div>
+      <div class="card-body">
+        <div id="records-empty" class="alert alert-secondary d-none mb-0">Записей нет</div>
+        <div id="records-preview" class="preview-list vstack gap-2"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container py-4 small muted">
+      © Bookcrossing Admin
+    </div>
+  </footer>
+
+  <script src="/static/app.js"></script>
+  <script>
+    const result = document.getElementById("result");
+    const tableSelect = document.getElementById("table-select");
+    const requestsEmpty = document.getElementById("requests-empty");
+    const requestsPreview = document.getElementById("requests-preview");
+    const recordsEmpty = document.getElementById("records-empty");
+    const recordsPreview = document.getElementById("records-preview");
+    let resultTimer;
+
+    function showResult(type, message, timeoutMs = 4000) {
+      clearTimeout(resultTimer);
+      result.className = `mb-3 alert alert-${type}`;
+      result.textContent = message;
+      if (timeoutMs > 0) {
+        resultTimer = setTimeout(() => {
+          result.className = "mb-3";
+          result.textContent = "";
+        }, timeoutMs);
+      }
+    }
+
+    function renderRequests(items) {
+      if (!Array.isArray(items) || items.length === 0) {
+        requestsEmpty.classList.remove("d-none");
+        requestsPreview.innerHTML = "";
+        return;
+      }
+      requestsEmpty.classList.add("d-none");
+      requestsPreview.innerHTML = items.slice(0, 3).map((item) => `
+        <article class="border rounded p-2 bg-white">
+          <div class="fw-semibold">${item.title}</div>
+          <div class="small text-muted">Автор: ${item.author}</div>
+          <div class="small text-muted">Адрес: ${item.address}</div>
+          <div class="mt-2">
+            <a href="/admin/requests/${item.id}/view" class="btn btn-sm btn-outline-secondary">Открыть</a>
+          </div>
+        </article>
+      `).join("");
+    }
+
+    function renderRecords(items) {
+      if (!Array.isArray(items) || items.length === 0) {
+        recordsEmpty.classList.remove("d-none");
+        recordsPreview.innerHTML = "";
+        return;
+      }
+      recordsEmpty.classList.add("d-none");
+      recordsPreview.innerHTML = items.slice(0, 3).map((item) => `
+        <article class="border rounded p-2 bg-white">
+          <div class="small"><strong>id:</strong> ${item.id}</div>
+          <pre class="mb-0 small json-preview">${JSON.stringify(item, null, 2)}</pre>
+        </article>
+      `).join("");
+    }
+
+    async function loadMeta() {
+      const response = await fetch("/admin/meta", { headers: {"Accept": "application/json"} });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail ? String(data.detail) : "Не удалось загрузить метаданные");
+      }
+      tableSelect.innerHTML = (data.tables || []).map((name) => `<option value="${name}">${name}</option>`).join("");
+    }
+
+    async function loadRequestsPreview() {
+      const response = await fetch("/admin/requests?page=1&per_page=3", { headers: {"Accept": "application/json"} });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail ? String(data.detail) : "Не удалось загрузить заявки");
+      }
+      renderRequests(data.items || []);
+    }
+
+    async function loadRecordsPreview() {
+      const tableName = tableSelect.value;
+      if (!tableName) {
+        renderRecords([]);
+        return;
+      }
+      const response = await fetch(`/admin/table/${tableName}?page=1&per_page=3`, { headers: {"Accept": "application/json"} });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail ? String(data.detail) : "Не удалось загрузить записи");
+      }
+      renderRecords(data.items || []);
+    }
+
+    tableSelect.addEventListener("change", () => {
+      loadRecordsPreview().catch((error) => {
+        showResult("danger", String(error.message || error));
+      });
+    });
+
+    (async () => {
+      try {
+        await loadMeta();
+        await Promise.all([loadRequestsPreview(), loadRecordsPreview()]);
+      } catch (error) {
+        showResult("danger", String(error.message || error));
+      }
+    })();
+  </script>
+</body>
+</html>

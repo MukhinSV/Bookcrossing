@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Все записи БД</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <style>
+    .json-box { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .create-form-wrap { border-top: 1px solid var(--border); padding-top: .9rem; }
+  </style>
+</head>
+<body class="bg-light d-flex flex-column">
+  <main class="container py-4 py-md-5 flex-grow-1 d-flex flex-column">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+      <h1 class="h3 mb-0">Все записи БД</h1>
+      <div class="d-flex gap-2" data-mobile-menu>
+        <a href="/admin/view" class="btn btn-outline-secondary">Админ-панель</a>
+        <a href="/main/view" class="btn btn-outline-secondary">На главную</a>
+      </div>
+    </div>
+
+    <div id="result" class="mb-3" role="status"></div>
+
+    <section class="card shadow-sm mb-4">
+      <div class="card-body">
+        <div class="row g-2">
+          <div class="col-12 col-md-3">
+            <label for="table-select" class="form-label">Таблица</label>
+            <select id="table-select" class="form-select"></select>
+          </div>
+          <div class="col-12 col-md-6">
+            <label for="q" class="form-label">Фильтр записей</label>
+            <input id="q" class="form-control" placeholder="Поиск по полям">
+          </div>
+          <div class="col-12 col-md-3 d-flex align-items-end gap-2 sp1">
+            <button id="apply-btn" type="button" class="btn btn-primary">Применить</button>
+            <button id="reset-btn" type="button" class="btn btn-outline-secondary">Сбросить</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card shadow-sm mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">Добавить запись</span>
+        <button id="toggle-create-form-btn" type="button" class="btn btn-sm btn-outline-primary">Показать форму</button>
+      </div>
+      <div class="card-body create-form-wrap">
+        <form id="create-form" class="row g-2 d-none">
+          <div id="create-fields" class="row g-2 col-12"></div>
+          <div class="col-12 d-flex gap-2">
+            <button type="submit" class="btn btn-success">Добавить</button>
+            <button id="reset-create-form-btn" type="button" class="btn btn-outline-secondary">Очистить</button>
+          </div>
+        </form>
+        <div id="create-form-empty" class="small text-muted d-none">Для выбранной таблицы нет полей для создания.</div>
+      </div>
+    </section>
+
+    <div id="table-empty" class="alert alert-secondary d-none">Записей нет</div>
+    <div id="table-list" class="vstack gap-3"></div>
+
+    <nav aria-label="Пагинация" class="mt-auto pt-1">
+      <ul id="pagination" class="pagination justify-content-center mb-0"></ul>
+      <div id="pagination-status" class="small text-muted text-center mt-2"></div>
+    </nav>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container py-4 small muted">
+      © Bookcrossing Admin
+    </div>
+  </footer>
+
+  <script src="/static/app.js"></script>
+  <script>
+    const result = document.getElementById("result");
+    const tableSelect = document.getElementById("table-select");
+    const qInput = document.getElementById("q");
+    const applyBtn = document.getElementById("apply-btn");
+    const resetBtn = document.getElementById("reset-btn");
+    const toggleCreateFormBtn = document.getElementById("toggle-create-form-btn");
+    const createForm = document.getElementById("create-form");
+    const createFields = document.getElementById("create-fields");
+    const resetCreateFormBtn = document.getElementById("reset-create-form-btn");
+    const createFormEmpty = document.getElementById("create-form-empty");
+    const tableEmpty = document.getElementById("table-empty");
+    const tableList = document.getElementById("table-list");
+    const pagination = document.getElementById("pagination");
+    const paginationStatus = document.getElementById("pagination-status");
+    let resultTimer;
+    let currentTable = null;
+    let currentPage = 1;
+    let totalPages = 0;
+    let tableColumnsMap = {};
+    let authorOptions = [];
+    let organisationOptions = [];
+    let bookOptions = [];
+    let userOptions = [];
+    let exchangePointOptions = [];
+
+    function showResult(type, message, timeoutMs = 4000) {
+      clearTimeout(resultTimer);
+      result.className = `mb-3 alert alert-${type}`;
+      result.textContent = message;
+      if (timeoutMs > 0) {
+        resultTimer = setTimeout(() => {
+          result.className = "mb-3";
+          result.textContent = "";
+        }, timeoutMs);
+      }
+    }
+
+    function parseJson(value) {
+      try { return JSON.parse(value); } catch (error) { return null; }
+    }
+
+    function getFieldInputType(columnType) {
+      const typeName = String(columnType || "").toLowerCase();
+      if (typeName.includes("int")) return "number";
+      if (typeName.includes("float")) return "number";
+      if (typeName.includes("bool")) return "checkbox";
+      if (typeName === "date") return "date";
+      if (typeName.includes("datetime")) return "datetime-local";
+      return "text";
+    }
+
+    function renderCreateForm() {
+      const columns = Array.isArray(tableColumnsMap[currentTable]) ? tableColumnsMap[currentTable] : [];
+      const visibleColumns = columns.filter((column) => column.name !== "id");
+
+      if (visibleColumns.length === 0) {
+        createFields.innerHTML = "";
+        createForm.classList.add("d-none");
+        createFormEmpty.classList.remove("d-none");
+        toggleCreateFormBtn.classList.add("disabled");
+        toggleCreateFormBtn.textContent = "Нет полей";
+        return;
+      }
+
+      createFormEmpty.classList.add("d-none");
+      toggleCreateFormBtn.classList.remove("disabled");
+      toggleCreateFormBtn.textContent = createForm.classList.contains("d-none") ? "Показать форму" : "Скрыть форму";
+
+      createFields.innerHTML = visibleColumns.map((column) => {
+        const inputType = getFieldInputType(column.type);
+        const requiredAttr = (!column.nullable && !column.has_default) ? "required" : "";
+        const hint = (!column.nullable && !column.has_default) ? " *" : "";
+
+        if (currentTable === "book" && column.name === "author_id") {
+          const options = authorOptions.map((author) => `
+            <option value="${author.id}">${author.fullname ?? `Автор #${author.id}`}</option>
+          `).join("");
+          return `
+            <div class="col-12 col-md-6">
+              <label class="form-label" for="create-${column.name}">${column.name}${hint}</label>
+              <select
+                id="create-${column.name}"
+                data-name="${column.name}"
+                data-type="${column.type}"
+                class="form-select form-select-sm"
+                ${requiredAttr}
+              >
+                <option value="">Выберите автора</option>
+                ${options}
+              </select>
+            </div>
+          `;
+        }
+
+        if (currentTable === "exchange_point" && column.name === "organisation_id") {
+          const options = organisationOptions.map((organisation) => `
+            <option value="${organisation.id}">${organisation.name ?? `Организация #${organisation.id}`}</option>
+          `).join("");
+          return `
+            <div class="col-12 col-md-6">
+              <label class="form-label" for="create-${column.name}">${column.name}${hint}</label>
+              <select
+                id="create-${column.name}"
+                data-name="${column.name}"
+                data-type="${column.type}"
+                class="form-select form-select-sm"
+                ${requiredAttr}
+              >
+                <option value="">Выберите организацию</option>
+                ${options}
+              </select>
+            </div>
+          `;
+        }
+
+        if (currentTable === "instance" && column.name === "book_id") {
+          const options = bookOptions.map((book) => `
+            <option value="${book.id}">${book.title ?? `Книга #${book.id}`}</option>
+          `).join("");
+          return `
+            <div class="col-12 col-md-6">
+              <label class="form-label" for="create-${column.name}">${column.name}${hint}</label>
+              <select
+                id="create-${column.name}"
+                data-name="${column.name}"
+                data-type="${column.type}"
+                class="form-select form-select-sm"
+                ${requiredAttr}
+              >
+                <option value="">Выберите книгу</option>
+                ${options}
+              </select>
+            </div>
+          `;
+        }
+
+        if (currentTable === "instance" && column.name === "owner_id") {
+          const options = userOptions.map((user) => {
+            const label = [user.lastname, user.name].filter(Boolean).join(" ").trim() || user.email || `Пользователь #${user.id}`;
+            return `<option value="${user.id}">${label}</option>`;
+          }).join("");
+          return `
+            <div class="col-12 col-md-6">
+              <label class="form-label" for="create-${column.name}">${column.name}${hint}</label>
+              <select
+                id="create-${column.name}"
+                data-name="${column.name}"
+                data-type="${column.type}"
+                class="form-select form-select-sm"
+                ${requiredAttr}
+              >
+                <option value="">Выберите владельца</option>
+                ${options}
+              </select>
+            </div>
+          `;
+        }
+
+        if (currentTable === "instance" && column.name === "exchange_point_id") {
+          const options = exchangePointOptions.map((point) => {
+            const organisationName = point.organisation?.name || `Организация #${point.organisation_id ?? "?"}`;
+            const address = point.organisation?.address ? ` (${point.organisation.address})` : "";
+            return `<option value="${point.id}">${organisationName}${address}</option>`;
+          }).join("");
+          return `
+            <div class="col-12 col-md-6">
+              <label class="form-label" for="create-${column.name}">${column.name}${hint}</label>
+              <select
+                id="create-${column.name}"
+                data-name="${column.name}"
+                data-type="${column.type}"
+                class="form-select form-select-sm"
+                ${requiredAttr}
+              >
+                <option value="">Выберите точку</option>
+                ${options}
+              </select>
+            </div>
+          `;
+        }
+
+        if (currentTable === "user" && column.name === "hashed_password") {
+          const passwordRequired = (!column.nullable && !column.has_default) ? "required" : "";
+          return `
+            <div class="col-12 col-md-6">
+              <label class="form-label" for="create-password">password${hint}</label>
+              <input
+                id="create-password"
+                data-name="password"
+                data-type="string"
+                type="password"
+                class="form-control form-control-sm"
+                ${passwordRequired}
+              >
+            </div>
+          `;
+        }
+
+        if (inputType === "checkbox") {
+          return `
+            <div class="col-12 col-md-6">
+              <label class="form-label" for="create-${column.name}">${column.name}${hint}</label>
+              <input id="create-${column.name}" data-name="${column.name}" data-type="${column.type}" type="checkbox">
+            </div>
+          `;
+        }
+
+        const stepAttr = inputType === "number" ? 'step="any"' : "";
+        return `
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="create-${column.name}">${column.name}${hint}</label>
+            <input
+              id="create-${column.name}"
+              data-name="${column.name}"
+              data-type="${column.type}"
+              type="${inputType}"
+              class="form-control form-control-sm"
+              ${stepAttr}
+              ${requiredAttr}
+            >
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderPagination() {
+      if (!totalPages || totalPages <= 0) {
+        pagination.innerHTML = "";
+        paginationStatus.textContent = "";
+        return;
+      }
+      const prevDisabled = currentPage <= 1 ? "disabled" : "";
+      const nextDisabled = currentPage >= totalPages ? "disabled" : "";
+      paginationStatus.textContent = `Страница ${currentPage} из ${totalPages}`;
+      pagination.innerHTML = `
+        <li class="page-item ${prevDisabled}"><button class="page-link" data-page="${currentPage - 1}">Назад</button></li>
+        <li class="page-item disabled"><span class="page-link">${currentPage}</span></li>
+        <li class="page-item ${nextDisabled}"><button class="page-link" data-page="${currentPage + 1}">Вперед</button></li>
+      `;
+      pagination.querySelectorAll("button[data-page]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const nextPage = Number(button.dataset.page);
+          if (!nextPage || nextPage < 1 || nextPage > totalPages || nextPage === currentPage) return;
+          loadTable(nextPage);
+        });
+      });
+    }
+
+    function renderRows(items) {
+      if (!Array.isArray(items) || items.length === 0) {
+        tableEmpty.classList.remove("d-none");
+        tableList.innerHTML = "";
+        return;
+      }
+      tableEmpty.classList.add("d-none");
+      tableList.innerHTML = items.map((item) => `
+        <article class="border rounded p-2 bg-white">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <strong>id: ${item.id}</strong>
+            <div class="d-flex gap-2">
+              <button class="btn btn-sm btn-outline-primary js-save" data-id="${item.id}">Сохранить</button>
+              <button class="btn btn-sm btn-outline-danger js-delete" data-id="${item.id}">Удалить</button>
+            </div>
+          </div>
+          <textarea class="form-control json-box js-json" rows="6" data-id="${item.id}">${JSON.stringify(item, null, 2)}</textarea>
+          ${currentTable === "book" ? `
+            <div class="d-flex gap-2 mt-2 flex-wrap align-items-center">
+              <input type="file" class="form-control form-control-sm js-image-file" data-id="${item.id}" style="max-width: 320px;" accept="image/*">
+              <button class="btn btn-sm btn-outline-secondary js-upload-image" data-id="${item.id}">Загрузить картинку</button>
+            </div>
+          ` : ""}
+        </article>
+      `).join("");
+
+      document.querySelectorAll(".js-save").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const id = Number(button.dataset.id);
+          const textarea = document.querySelector(`.js-json[data-id="${id}"]`);
+          const payload = parseJson(textarea.value);
+          if (!payload) {
+            showResult("danger", "Некорректный JSON");
+            return;
+          }
+          const response = await fetch(`/admin/table/${currentTable}/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            showResult("danger", data.detail ? String(data.detail) : "Не удалось сохранить");
+            return;
+          }
+          showResult("success", "Запись обновлена");
+          await loadTable(currentPage);
+        });
+      });
+
+      document.querySelectorAll(".js-delete").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const id = Number(button.dataset.id);
+          const response = await fetch(`/admin/table/${currentTable}/${id}`, { method: "DELETE" });
+          const data = await response.json();
+          if (!response.ok) {
+            showResult("danger", data.detail ? String(data.detail) : "Не удалось удалить");
+            return;
+          }
+          showResult("success", "Запись удалена");
+          await loadTable(currentPage);
+        });
+      });
+
+      document.querySelectorAll(".js-upload-image").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const id = Number(button.dataset.id);
+          const fileInput = document.querySelector(`.js-image-file[data-id="${id}"]`);
+          if (!fileInput || !fileInput.files || !fileInput.files[0]) {
+            showResult("danger", "Выберите файл");
+            return;
+          }
+          const formData = new FormData();
+          formData.set("image_file", fileInput.files[0]);
+          const response = await fetch(`/admin/table/book/${id}/image`, { method: "POST", body: formData });
+          const data = await response.json();
+          if (!response.ok) {
+            showResult("danger", data.detail ? String(data.detail) : "Не удалось загрузить картинку");
+            return;
+          }
+          showResult("success", "Картинка обновлена");
+          await loadTable(currentPage);
+        });
+      });
+    }
+
+    async function loadMeta() {
+      const response = await fetch("/admin/meta", { headers: {"Accept": "application/json"} });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail ? String(data.detail) : "Не удалось загрузить метаданные");
+      tableSelect.innerHTML = (data.tables || []).map((name) => `<option value="${name}">${name}</option>`).join("");
+      tableColumnsMap = data.table_columns || {};
+      authorOptions = Array.isArray(data.authors) ? data.authors : [];
+      organisationOptions = Array.isArray(data.organisations) ? data.organisations : [];
+      bookOptions = Array.isArray(data.books) ? data.books : [];
+      userOptions = Array.isArray(data.users) ? data.users : [];
+      exchangePointOptions = Array.isArray(data.exchange_points) ? data.exchange_points : [];
+      currentTable = tableSelect.value || null;
+      renderCreateForm();
+    }
+
+    async function loadTable(page = 1) {
+      if (!currentTable) return;
+      const params = new URLSearchParams();
+      params.set("page", String(page));
+      params.set("per_page", "10");
+      const q = qInput.value.trim();
+      if (q) params.set("q", q);
+      const response = await fetch(`/admin/table/${currentTable}?${params.toString()}`, { headers: {"Accept": "application/json"} });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail ? String(data.detail) : "Не удалось загрузить записи");
+      currentPage = data.page ?? 1;
+      totalPages = data.total_pages ?? 0;
+      renderRows(data.items || []);
+      renderPagination();
+    }
+
+    tableSelect.addEventListener("change", () => {
+      currentTable = tableSelect.value;
+      createForm.classList.add("d-none");
+      renderCreateForm();
+      loadTable(1).catch((error) => showResult("danger", String(error.message || error)));
+    });
+    applyBtn.addEventListener("click", () => {
+      loadTable(1).catch((error) => showResult("danger", String(error.message || error)));
+    });
+    resetBtn.addEventListener("click", () => {
+      qInput.value = "";
+      loadTable(1).catch((error) => showResult("danger", String(error.message || error)));
+    });
+
+    toggleCreateFormBtn.addEventListener("click", () => {
+      if (toggleCreateFormBtn.classList.contains("disabled")) return;
+      const hidden = createForm.classList.contains("d-none");
+      createForm.classList.toggle("d-none", !hidden);
+      toggleCreateFormBtn.textContent = hidden ? "Скрыть форму" : "Показать форму";
+    });
+
+    resetCreateFormBtn.addEventListener("click", () => {
+      createForm.reset();
+    });
+
+    createForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!currentTable) return;
+      const payload = {};
+      createForm.querySelectorAll("[data-name]").forEach((input) => {
+        const fieldName = input.dataset.name;
+        const fieldType = String(input.dataset.type || "").toLowerCase();
+        if (input.type === "checkbox") {
+          payload[fieldName] = Boolean(input.checked);
+          return;
+        }
+        const rawValue = input.value;
+        if (rawValue === "") {
+          return;
+        }
+        if (fieldType.includes("datetime")) {
+          payload[fieldName] = new Date(rawValue).toISOString();
+          return;
+        }
+        payload[fieldName] = rawValue;
+      });
+
+      if (Object.keys(payload).length === 0) {
+        showResult("danger", "Заполните хотя бы одно поле");
+        return;
+      }
+
+      const response = await fetch(`/admin/table/${currentTable}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        showResult("danger", data.detail ? String(data.detail) : "Не удалось создать запись");
+        return;
+      }
+      showResult("success", "Запись добавлена");
+      createForm.reset();
+      await loadTable(1);
+    });
+
+    (async () => {
+      try {
+        await loadMeta();
+        await loadTable(1);
+      } catch (error) {
+        showResult("danger", String(error.message || error));
+      }
+    })();
+  </script>
+</body>
+</html>

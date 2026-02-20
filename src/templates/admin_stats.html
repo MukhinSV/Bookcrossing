@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Статистика</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <style>
+    body {
+      min-height: 100vh;
+      background: var(--bg);
+    }
+    .stat-card {
+      border: 1px solid var(--border);
+      border-radius: 1.1rem;
+      background: color-mix(in srgb, var(--surface) 90%, transparent);
+      backdrop-filter: blur(16px);
+      box-shadow: var(--shadow);
+      height: 100%;
+    }
+    .stat-number {
+      font-size: 2rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .org-list {
+      margin: 0;
+      padding-left: 1.1rem;
+    }
+    .org-list li + li {
+      margin-top: .45rem;
+    }
+  </style>
+</head>
+<body class="bg-light d-flex flex-column">
+  <main class="container py-4 py-md-5 flex-grow-1">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+      <div>
+        <h1 class="h3 mb-1">Статистика сайта</h1>
+        <p class="text-muted mb-0">Сводка по основным метрикам Bookcrossing</p>
+      </div>
+      <div class="d-flex gap-2" data-mobile-menu>
+        <a href="/admin/view" class="btn btn-outline-secondary">Админ-панель</a>
+        <a href="/main/view" class="btn btn-outline-secondary">На главную</a>
+      </div>
+    </div>
+
+    <div id="result" class="mb-3" role="status"></div>
+
+    <section class="row g-3 mb-4">
+      <div class="col-12 col-md-4">
+        <article class="stat-card p-4">
+          <div class="text-muted mb-2">Пользователи</div>
+          <div id="users-total" class="stat-number">0</div>
+        </article>
+      </div>
+      <div class="col-12 col-md-4">
+        <article class="stat-card p-4">
+          <div class="text-muted mb-2">Доступные книги</div>
+          <div id="instances-total" class="stat-number">0</div>
+        </article>
+      </div>
+      <div class="col-12 col-md-4">
+        <article class="stat-card p-4">
+          <div class="text-muted mb-2">Учебные заведения</div>
+          <div id="organisations-total" class="stat-number">0</div>
+        </article>
+      </div>
+    </section>
+
+    <section class="row g-3">
+      <div class="col-12 col-lg-7">
+        <article class="stat-card p-3 p-md-4">
+          <h2 class="h5 mb-3">Сравнение основных показателей</h2>
+          <canvas id="totals-chart" height="120"></canvas>
+        </article>
+      </div>
+      <div class="col-12 col-lg-5 sp2">
+        <article class="stat-card p-3 p-md-4">
+          <h2 class="h5 mb-3">Уже сотрудничаем с</h2>
+          <ul id="org-list" class="org-list">
+            <li class="text-muted">Загрузка...</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container py-4 small muted">
+      © Bookcrossing Admin
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="/static/app.js"></script>
+  <script>
+    const result = document.getElementById("result");
+    const usersTotal = document.getElementById("users-total");
+    const instancesTotal = document.getElementById("instances-total");
+    const organisationsTotal = document.getElementById("organisations-total");
+    const orgList = document.getElementById("org-list");
+    let resultTimer;
+
+    function showResult(type, message, timeoutMs = 4000) {
+      clearTimeout(resultTimer);
+      result.className = `mb-3 alert alert-${type}`;
+      result.textContent = message;
+      if (timeoutMs > 0) {
+        resultTimer = setTimeout(() => {
+          result.className = "mb-3";
+          result.textContent = "";
+        }, timeoutMs);
+      }
+    }
+
+    function renderCharts(data) {
+      const totals = data.totals || {};
+      const names = Array.isArray(data.organisations_names) ? data.organisations_names : [];
+
+      usersTotal.textContent = String(totals.users || 0);
+      instancesTotal.textContent = String(totals.instances || 0);
+      organisationsTotal.textContent = String(totals.organisations || 0);
+
+      if (names.length === 0) {
+        orgList.innerHTML = '<li class="text-muted">Пока нет организаций</li>';
+      } else {
+        orgList.innerHTML = names.map((name) => `<li>${name}</li>`).join("");
+      }
+
+      const rootStyles = getComputedStyle(document.documentElement);
+      const textMuted = rootStyles.getPropertyValue("--text-muted").trim() || "#6b7280";
+      const border = rootStyles.getPropertyValue("--border").trim() || "#d1d5db";
+
+      new Chart(document.getElementById("totals-chart"), {
+        type: "bar",
+        data: {
+          labels: ["Пользователи", "Доступные книги"],
+          datasets: [{
+            label: "Количество",
+            data: [totals.users || 0, totals.instances || 0],
+            backgroundColor: ["#4f7cff", "#4fbf92"],
+            borderRadius: 8
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {display: false}
+          },
+          scales: {
+            x: {
+              ticks: {color: textMuted},
+              grid: {color: border}
+            },
+            y: {
+              beginAtZero: true,
+              ticks: {precision: 0, color: textMuted},
+              grid: {color: border}
+            }
+          }
+        }
+      });
+    }
+
+    async function loadStats() {
+      try {
+        const response = await fetch("/admin/stats/data", {
+          method: "GET",
+          headers: {"Accept": "application/json"}
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          showResult("danger", data.detail ? String(data.detail) : "Не удалось загрузить статистику");
+          return;
+        }
+        renderCharts(data);
+      } catch (error) {
+        showResult("danger", "Ошибка загрузки статистики");
+      }
+    }
+
+    loadStats();
+  </script>
+</body>
+</html>

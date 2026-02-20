@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Профиль</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <style>
+    body {
+      min-height: 100vh;
+    }
+    .site-footer {
+      background: var(--bg-solid);
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+    .site-footer .muted {
+      color: var(--text-muted);
+    }
+    @media (max-width: 699.98px) {
+      #own-books-body td:last-child {
+        min-width: 84px;
+      }
+      .own-status-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        white-space: nowrap;
+        line-height: 1;
+        text-align: center;
+        padding: .12rem .34rem;
+        font-size: .62rem;
+      }
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <main class="container py-4 py-md-5">
+    <div class="d-flex align-items-center justify-content-between mb-4">
+      <div>
+        <h1 class="h3 mb-1">Профиль пользователя</h1>
+        <a id="admin-panel-link" href="/admin/view" class="small text-decoration-none d-none">
+          Перейти на админ панель
+        </a>
+      </div>
+      <div class="d-flex gap-2" data-mobile-menu>
+        <a href="/" class="btn btn-outline-secondary">На главную</a>
+        <button id="logout-btn" type="button" class="btn btn-outline-danger">Выйти</button>
+      </div>
+    </div>
+
+    <div id="result" class="mb-3" role="status"></div>
+
+    <section class="card shadow-sm mb-4">
+      <div class="card-header fw-semibold">Профиль</div>
+      <div class="card-body">
+        <form id="profile-form" class="vstack gap-3">
+          <div>
+            <label for="user-name" class="form-label">Имя</label>
+            <input id="user-name" type="text" class="form-control" required readonly>
+          </div>
+
+          <div>
+            <label for="user-lastname" class="form-label">Фамилия</label>
+            <input id="user-lastname" type="text" class="form-control" required readonly>
+          </div>
+
+          <div>
+            <label for="user-email" class="form-label">Email</label>
+            <input id="user-email" type="email" class="form-control" required readonly>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button id="edit-profile-btn" type="button" class="btn btn-outline-primary">Изменить</button>
+            <button id="save-profile-btn" type="submit" class="btn btn-primary d-none">Сохранить изменения</button>
+            <button id="cancel-profile-btn" type="button" class="btn btn-light d-none">Отмена</button>
+          </div>
+        </form>
+        <div id="profile-update-result" class="mt-3" role="status"></div>
+      </div>
+    </section>
+
+    <section class="card shadow-sm mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">Отданные книги</span>
+        <a href="/profile/records/own/view" class="btn btn-sm btn-outline-primary">Все записи</a>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Название</th>
+                <th>Автор</th>
+                <th>Статус</th>
+              </tr>
+            </thead>
+            <tbody id="own-books-body">
+              <tr><td colspan="3" class="text-muted">Нет данных</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="card shadow-sm mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">Взятые книги</span>
+        <a href="/profile/records/rent/view" class="btn btn-sm btn-outline-primary">Все записи</a>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Название</th>
+                <th>Автор</th>
+                <th>Действия</th>
+              </tr>
+            </thead>
+            <tbody id="rent-books-body">
+              <tr><td colspan="3" class="text-muted">Нет данных</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="card shadow-sm">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">Бронирования</span>
+        <a href="/profile/records/booking/view" class="btn btn-sm btn-outline-primary">Все записи</a>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Название</th>
+                <th>Действия</th>
+              </tr>
+            </thead>
+            <tbody id="booking-body">
+              <tr><td colspan="2" class="text-muted">Нет данных</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <div class="text-center mt-4">
+      <a href="/profile/add-book/view" class="btn btn-primary px-4">Отдать книгу</a>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container py-4 small muted">
+      © Bookcrossing. Читайте, делитесь, возвращайте книги в оборот.
+    </div>
+  </footer>
+
+  <script src="/static/app.js"></script>
+  <script>
+    const result = document.getElementById("result");
+    const profileForm = document.getElementById("profile-form");
+    const profileUpdateResult = document.getElementById("profile-update-result");
+    const editProfileBtn = document.getElementById("edit-profile-btn");
+    const saveProfileBtn = document.getElementById("save-profile-btn");
+    const cancelProfileBtn = document.getElementById("cancel-profile-btn");
+    const userNameInput = document.getElementById("user-name");
+    const userLastnameInput = document.getElementById("user-lastname");
+    const userEmailInput = document.getElementById("user-email");
+    const adminPanelLink = document.getElementById("admin-panel-link");
+    const ownBooksBody = document.getElementById("own-books-body");
+    const rentBooksBody = document.getElementById("rent-books-body");
+    const bookingBody = document.getElementById("booking-body");
+    const logoutBtn = document.getElementById("logout-btn");
+    let resultTimer;
+    let profileUpdateTimer;
+    let currentUser = null;
+    let exchangePoints = [];
+    let isProfileEditing = false;
+
+    function showNotice(element, baseClass, type, message, timeoutMs = 4000) {
+      if (element === result) {
+        clearTimeout(resultTimer);
+      }
+      if (element === profileUpdateResult) {
+        clearTimeout(profileUpdateTimer);
+      }
+
+      element.className = `${baseClass} alert alert-${type}`;
+      element.textContent = message;
+
+      if (timeoutMs > 0) {
+        const timer = setTimeout(() => {
+          element.className = baseClass;
+          element.textContent = "";
+        }, timeoutMs);
+
+        if (element === result) {
+          resultTimer = timer;
+        }
+        if (element === profileUpdateResult) {
+          profileUpdateTimer = timer;
+        }
+      }
+    }
+
+    function setProfileEditingMode(isEditing) {
+      isProfileEditing = isEditing;
+      userNameInput.readOnly = !isEditing;
+      userLastnameInput.readOnly = !isEditing;
+      userEmailInput.readOnly = !isEditing;
+      saveProfileBtn.classList.toggle("d-none", !isEditing);
+      cancelProfileBtn.classList.toggle("d-none", !isEditing);
+      editProfileBtn.classList.toggle("d-none", isEditing);
+    }
+
+    function setUser(user) {
+      currentUser = user;
+      userNameInput.value = user?.name ?? "";
+      userLastnameInput.value = user?.lastname ?? "";
+      userEmailInput.value = user?.email ?? "";
+      const isAdmin = user?.role === "ADMIN";
+      adminPanelLink.classList.toggle("d-none", !isAdmin);
+    }
+
+    function renderBooks(tbody, items) {
+      if (!Array.isArray(items) || items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-muted">Нет данных</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = items.map((item) => {
+        const isPending = Boolean(item.pending);
+        const statusBadge = isPending
+          ? '<span class="badge text-bg-warning own-status-badge">В обработке</span>'
+          : '<span class="badge text-bg-success own-status-badge">Доступна</span>';
+        return `
+          <tr>
+            <td>${item.title ?? "-"}</td>
+            <td>${item.author ?? "-"}</td>
+            <td>${statusBadge}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    function renderRentBooks(items) {
+      if (!Array.isArray(items) || items.length === 0) {
+        rentBooksBody.innerHTML = '<tr><td colspan="3" class="text-muted">Нет данных</td></tr>';
+        return;
+      }
+
+      rentBooksBody.innerHTML = items.map((item) => {
+        const selectOptions = exchangePoints.map((point) => `
+          <option value="${point.id}">
+            ${point.organisation?.address ?? "Адрес не указан"}
+          </option>
+        `).join("");
+
+        return `
+          <tr>
+            <td>${item.book?.title ?? "-"}</td>
+            <td>${item.book?.author?.fullname ?? "-"}</td>
+            <td>
+              <div class="d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-sm btn-outline-primary js-return-open" data-instance-id="${item.id}">
+                  Вернуть
+                </button>
+              </div>
+              <div class="d-none mt-2 js-return-form" data-instance-id="${item.id}">
+                <select class="form-select form-select-sm mb-2 js-return-select" data-instance-id="${item.id}">
+                  ${selectOptions}
+                </select>
+                <button type="button" class="btn btn-sm btn-success js-return-confirm" data-instance-id="${item.id}">
+                  Подтвердить возврат
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join("");
+
+      document.querySelectorAll(".js-return-open").forEach((button) => {
+        button.addEventListener("click", () => {
+          const instanceId = button.dataset.instanceId;
+          const form = document.querySelector(`.js-return-form[data-instance-id="${instanceId}"]`);
+          if (form) {
+            const isHidden = form.classList.contains("d-none");
+
+            document.querySelectorAll(".js-return-form").forEach((otherForm) => {
+              otherForm.classList.add("d-none");
+            });
+            document.querySelectorAll(".js-return-open").forEach((otherButton) => {
+              otherButton.textContent = "Вернуть";
+            });
+
+            if (isHidden) {
+              form.classList.remove("d-none");
+              button.textContent = "Скрыть";
+            } else {
+              form.classList.add("d-none");
+              button.textContent = "Вернуть";
+            }
+          }
+        });
+      });
+
+      document.querySelectorAll(".js-return-confirm").forEach((button) => {
+        button.addEventListener("click", () => {
+          const instanceId = Number(button.dataset.instanceId);
+          const select = document.querySelector(`.js-return-select[data-instance-id="${instanceId}"]`);
+          const exchangePointId = Number(select?.value);
+          handleReturnBook(instanceId, exchangePointId);
+        });
+      });
+    }
+
+    async function handleReturnBook(instanceId, exchangePointId) {
+      if (!exchangePointId) {
+        showNotice(result, "mb-3", "danger", "Выберите адрес возврата");
+        return;
+      }
+
+      try {
+        const response = await fetch(`/profile/return/${instanceId}`, {
+          method: "PATCH",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({exchange_point_id: exchangePointId})
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          showNotice(result, "mb-3", "danger", data.detail ? String(data.detail) : "Не удалось вернуть книгу");
+          return;
+        }
+        showNotice(result, "mb-3", "success", "Книга успешно возвращена");
+        await loadProfile();
+      } catch (error) {
+        showNotice(result, "mb-3", "danger", "Ошибка запроса");
+      }
+    }
+
+    function renderBookings(items) {
+      if (!Array.isArray(items) || items.length === 0) {
+        bookingBody.innerHTML = '<tr><td colspan="2" class="text-muted">Нет данных</td></tr>';
+        return;
+      }
+
+      bookingBody.innerHTML = items.map((item) => {
+        return `
+          <tr>
+            <td>${item.instance?.book?.title ?? "-"}</td>
+            <td>
+              <div class="d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-sm btn-success js-booking-picked" data-booking-id="${item.id}">
+                  Уже забрал
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-danger js-booking-cancel" data-booking-id="${item.id}">
+                  Отменить
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join("");
+
+      document.querySelectorAll(".js-booking-picked").forEach((button) => {
+        button.addEventListener("click", () => {
+          const bookingId = Number(button.dataset.bookingId);
+          handleBookingAction("PATCH", bookingId, "Книга отмечена как полученная");
+        });
+      });
+
+      document.querySelectorAll(".js-booking-cancel").forEach((button) => {
+        button.addEventListener("click", () => {
+          const bookingId = Number(button.dataset.bookingId);
+          handleBookingAction("DELETE", bookingId, "Бронирование отменено");
+        });
+      });
+    }
+
+    async function handleBookingAction(method, bookingId, successMessage) {
+      try {
+        const response = await fetch(`/profile/${bookingId}`, {method});
+        const data = await response.json();
+        if (!response.ok) {
+          showNotice(result, "mb-3", "danger", data.detail ? String(data.detail) : "Не удалось выполнить действие");
+          return;
+        }
+        showNotice(result, "mb-3", "success", successMessage);
+        await loadProfile();
+      } catch (error) {
+        showNotice(result, "mb-3", "danger", "Ошибка запроса");
+      }
+    }
+
+    async function loadProfile() {
+      // showNotice(result, "mb-3", "info", "Загрузка...", 0);
+
+      try {
+        const response = await fetch("/profile", {
+          method: "GET",
+          headers: {
+            "Accept": "application/json"
+          }
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          showNotice(result, "mb-3", "danger", errorData.detail ? String(errorData.detail) : "Ошибка загрузки профиля");
+          return;
+        }
+
+        const data = await response.json();
+        setUser(data.user);
+        exchangePoints = Array.isArray(data.exchanges_point) ? data.exchanges_point : [];
+        renderBooks(ownBooksBody, data.user_own_book);
+        renderRentBooks(data.user_rent_book);
+        renderBookings(data.user_booking);
+
+        // showNotice(result, "mb-3", "success", "Данные профиля успешно загружены");
+      } catch (error) {
+        showNotice(result, "mb-3", "danger", "Не удалось загрузить данные профиля");
+      }
+    }
+
+    profileForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      profileUpdateResult.className = "";
+      profileUpdateResult.textContent = "";
+
+      const name = document.getElementById("user-name").value.trim();
+      const lastname = document.getElementById("user-lastname").value.trim();
+      const email = document.getElementById("user-email").value.trim();
+
+      const payload = {};
+      if (currentUser && name && name !== currentUser.name) {
+        payload.name = name;
+      }
+      if (currentUser && lastname && lastname !== currentUser.lastname) {
+        payload.lastname = lastname;
+      }
+      if (currentUser && email && email !== currentUser.email) {
+        payload.email = email;
+      }
+
+      if (Object.keys(payload).length === 0) {
+        showNotice(profileUpdateResult, "mt-3", "secondary", "Нет изменений для сохранения");
+        setProfileEditingMode(false);
+        return;
+      }
+
+      try {
+        const response = await fetch("/profile", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          showNotice(profileUpdateResult, "mt-3", "danger", data.detail ? String(data.detail) : "Ошибка обновления профиля");
+          return;
+        }
+
+        showNotice(profileUpdateResult, "mt-3", "success", "Профиль успешно обновлен");
+        await loadProfile();
+        setProfileEditingMode(false);
+      } catch (error) {
+        showNotice(profileUpdateResult, "mt-3", "danger", "Не удалось отправить запрос");
+      }
+    });
+
+    editProfileBtn.addEventListener("click", () => {
+      setProfileEditingMode(true);
+      profileUpdateResult.className = "";
+      profileUpdateResult.textContent = "";
+    });
+
+    cancelProfileBtn.addEventListener("click", () => {
+      setUser(currentUser);
+      setProfileEditingMode(false);
+      profileUpdateResult.className = "";
+      profileUpdateResult.textContent = "";
+    });
+
+    logoutBtn.addEventListener("click", async () => {
+      try {
+        const response = await fetch("/auth/logout", {
+          method: "POST"
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          showNotice(result, "mb-3", "danger", data.detail ? String(data.detail) : "Ошибка выхода");
+          return;
+        }
+        // showNotice(result, "mb-3", "success", "Вы вышли из аккаунта");
+        setTimeout(() => {
+          window.location.href = "/auth/login";
+        }, 700);
+      } catch (error) {
+        showNotice(result, "mb-3", "danger", "Не удалось выполнить выход");
+      }
+    });
+
+    setProfileEditingMode(false);
+    loadProfile();
+  </script>
+</body>
+</html>

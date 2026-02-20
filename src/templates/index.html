@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bookcrossing</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <style>
+    .hero,
+    .catalog-section,
+    .news-section,
+    .shelf-section {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: color-mix(in srgb, var(--surface) 88%, transparent);
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+      padding: 1.25rem;
+    }
+    .hero::before,
+    .news-section::before,
+    .shelf-section::before {
+      content: "";
+      position: absolute;
+      border-radius: 999px;
+      pointer-events: none;
+      opacity: .55;
+    }
+    .hero::before {
+      width: 320px;
+      height: 320px;
+      left: -130px;
+      bottom: -150px;
+      background: color-mix(in srgb, var(--primary) 10%, transparent);
+    }
+    .news-section::before {
+      width: 320px;
+      height: 320px;
+      right: -130px;
+      bottom: -120px;
+      background: color-mix(in srgb, #99a3b8 24%, transparent);
+    }
+    .shelf-section::before {
+      width: 240px;
+      height: 240px;
+      right: -80px;
+      top: -70px;
+      background: color-mix(in srgb, var(--primary) 9%, transparent);
+    }
+    .news-card,
+    .shelf-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: color-mix(in srgb, var(--surface) 92%, transparent);
+      transition: transform .2s ease, box-shadow .2s ease;
+      box-shadow: 0 10px 18px rgba(7, 14, 12, 0.08);
+      position: relative;
+      overflow: hidden;
+    }
+    .news-card:hover,
+    .shelf-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 16px 24px rgba(7, 14, 12, 0.15);
+    }
+    .shelf-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 3px;
+      background: color-mix(in srgb, var(--primary) 70%, #9aa6bf);
+    }
+    .news-card .card-body,
+    .shelf-card .card-body {
+      padding: 1.2rem 1.25rem;
+    }
+    .book-card { min-height: 260px; }
+    .book-cover-frame {
+      margin: 0.75rem auto 0;
+      width: 44%;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      background: var(--surface);
+      aspect-ratio: 2 / 3;
+    }
+    .book-cover {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    #books-carousel.books-single .book-card {
+      max-width: 280px;
+      margin-inline: auto;
+      min-height: 220px;
+    }
+    #books-carousel.books-single .book-cover-frame {
+      width: 52%;
+    }
+    .news-badge {
+      display: inline-block;
+      font-size: .72rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--primary);
+      background: color-mix(in srgb, var(--primary) 14%, transparent);
+      border-radius: 999px;
+      padding: .2rem .58rem;
+      margin-bottom: .45rem;
+      font-weight: 700;
+    }
+    .shelf-address {
+      display: inline-block;
+      font-size: .85rem;
+      background: color-mix(in srgb, var(--surface-soft) 88%, transparent);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: .22rem .62rem;
+      margin-bottom: .42rem;
+    }
+    .site-footer .muted { color: var(--text-muted); }
+    @media (max-width: 699.98px) {
+      #header-actions {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: .4rem !important;
+      }
+      #header-actions .btn {
+        width: 100%;
+        justify-content: flex-start;
+      }
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <header class="site-header">
+    <nav class="container py-3 d-flex align-items-center justify-content-between">
+      <a class="navbar-brand fw-bold mb-0 site-brand" href="/">Bookcrossing</a>
+      <div class="d-flex gap-2" data-mobile-menu>
+        <a href="/book/catalog/view" class="btn btn-outline-secondary">Каталог</a>
+        <div id="header-actions" class="d-flex gap-2"></div>
+      </div>
+    </nav>
+  </header>
+
+  <main class="container py-4 py-md-5">
+    <div id="global-result" class="mb-3" role="status"></div>
+
+    <section class="hero p-4 p-md-5 mb-5">
+      <h1 class="h2 mb-3">Меняем книги, а не храним их на полках</h1>
+      <div class="news-card">
+        <div class="card-body">
+          <p class="mb-0 special">
+            Bookcrossing помогает находить книги рядом, брать их в оборот и делиться прочитанным.
+            Выбирайте книгу в каталоге, следите за очередями и находите ближайшие точки обмена.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="catalog-section mb-5">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <h2 class="h4 mb-0">
+          <a href="/book/catalog/view" class="text-decoration-none text-dark">Каталог книг</a>
+        </h2>
+        <a href="/book/catalog/view" class="btn btn-sm btn-outline-primary">Открыть каталог</a>
+      </div>
+      <div id="books-empty" class="alert alert-secondary d-none mb-0">Каталог пока пуст.</div>
+      <div id="books-carousel" class="books-slider d-none" aria-live="polite">
+        <div id="books-carousel-inner" class="books-slider-inner"></div>
+        <div class="books-slider-controls">
+          <button id="books-prev-btn" class="books-slider-btn" type="button" aria-label="Предыдущий слайд">←</button>
+          <button id="books-next-btn" class="books-slider-btn" type="button" aria-label="Следующий слайд">→</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="news-section mb-5">
+      <h2 class="h4 mb-3 news-title">Новости сайта</h2>
+      <div class="row g-3 position-relative">
+        <div class="col-12 col-md-6 col-lg-4">
+          <article class="news-card">
+            <div class="card-body">
+              <span class="news-badge">Обновление</span>
+              <h3 class="h6">Новые точки обмена</h3>
+              <p class="mb-0">Мы расширяем сеть полок. Проверьте раздел адресов и найдите ближайшую к вам.</p>
+            </div>
+          </article>
+        </div>
+        <div class="col-12 col-md-6 col-lg-4">
+          <article class="news-card">
+            <div class="card-body">
+              <span class="news-badge">Каталог</span>
+              <h3 class="h6">Каталог обновляется ежедневно</h3>
+              <p class="mb-0">Пользователи добавляют новые книги каждый день. Следите за подборкой в слайдере.</p>
+            </div>
+          </article>
+        </div>
+        <div class="col-12 col-md-6 col-lg-4">
+          <article class="news-card">
+            <div class="card-body">
+              <span class="news-badge">Профиль</span>
+              <h3 class="h6">Улучшен личный кабинет</h3>
+              <p class="mb-0">Теперь в профиле проще отслеживать свои книги, взятые экземпляры и очереди.</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="shelf-section">
+      <div class="d-flex align-items-center justify-content-between mb-3 position-relative">
+        <h2 class="h4 mb-0">Адреса полок</h2>
+        <a href="/main/shelves/view" class="btn btn-sm btn-outline-primary">Все адреса</a>
+      </div>
+      <div id="org-empty" class="alert alert-secondary d-none mb-0 position-relative">Адреса пока не добавлены.</div>
+      <div id="org-list" class="row g-3 position-relative"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container py-4 small muted">
+      © Bookcrossing. Читайте, делитесь, возвращайте книги в оборот.
+    </div>
+  </footer>
+
+  <script src="/static/app.js"></script>
+  <script>
+    const headerActions = document.getElementById("header-actions");
+    const globalResult = document.getElementById("global-result");
+    const booksEmpty = document.getElementById("books-empty");
+    const booksCarousel = document.getElementById("books-carousel");
+    const booksCarouselInner = document.getElementById("books-carousel-inner");
+    const booksPrevBtn = document.getElementById("books-prev-btn");
+    const booksNextBtn = document.getElementById("books-next-btn");
+    const orgEmpty = document.getElementById("org-empty");
+    const orgList = document.getElementById("org-list");
+    let resultTimer;
+    let cachedBooks = [];
+    let activeSlideIndex = 0;
+    let dragStartX = 0;
+    const dragThresholdPx = 40;
+
+    function showResult(type, message, timeoutMs = 4000) {
+      clearTimeout(resultTimer);
+      globalResult.className = `mb-3 alert alert-${type}`;
+      globalResult.textContent = message;
+      if (timeoutMs > 0) {
+        resultTimer = setTimeout(() => {
+          globalResult.className = "mb-3";
+          globalResult.textContent = "";
+        }, timeoutMs);
+      }
+    }
+
+    function renderHeader(user) {
+      if (!user) {
+        headerActions.innerHTML = '<a href="/auth/login" class="btn btn-primary">Войти</a>';
+        return;
+      }
+      headerActions.innerHTML = `
+        <a href="/profile/view" class="btn btn-outline-primary">Личный кабинет</a>
+        <button id="logout-btn" type="button" class="btn btn-outline-danger">Выйти</button>
+      `;
+      const logoutBtn = document.getElementById("logout-btn");
+      logoutBtn.addEventListener("click", async () => {
+        try {
+          const response = await fetch("/auth/logout", { method: "POST" });
+          const data = await response.json();
+          if (!response.ok) {
+            showResult("danger", data.detail ? String(data.detail) : "Ошибка выхода");
+            return;
+          }
+          // showResult("success", "Вы вышли из аккаунта");
+          setTimeout(() => {
+            window.location.href = "/";
+          }, 700);
+        } catch (error) {
+          // showResult("danger", "Не удалось выполнить выход");
+        }
+      });
+    }
+
+    function getBooksPerSlide() {
+      if (window.innerWidth >= 992) {
+        return 3;
+      }
+      if (window.innerWidth >= 768) {
+        return 2;
+      }
+      return 1;
+    }
+
+    function chunkArray(items, size) {
+      const chunks = [];
+      for (let index = 0; index < items.length; index += size) {
+        chunks.push(items.slice(index, index + size));
+      }
+      return chunks;
+    }
+
+    function renderBooks(books) {
+      if (!Array.isArray(books) || books.length === 0) {
+        booksEmpty.classList.remove("d-none");
+        booksCarousel.classList.add("d-none");
+        return;
+      }
+
+      cachedBooks = books;
+      if (cachedBooks.length === 0) {
+        booksEmpty.classList.remove("d-none");
+        booksCarousel.classList.add("d-none");
+        return;
+      }
+
+      booksEmpty.classList.add("d-none");
+      booksCarousel.classList.remove("d-none");
+
+      const booksPerSlide = getBooksPerSlide();
+      const slides = chunkArray(cachedBooks, booksPerSlide);
+      activeSlideIndex = Math.min(activeSlideIndex, Math.max(slides.length - 1, 0));
+      booksCarousel.classList.toggle("books-single", booksPerSlide === 1);
+
+      booksCarouselInner.innerHTML = slides.map((slide, slideIndex) => {
+        const cards = slide.map((book) => {
+          const imageSrc = resolveBookImage(book.image);
+          return `
+            <div class="col-12 ${booksPerSlide > 1 ? "col-md-6" : ""} ${booksPerSlide > 2 ? "col-lg-4" : ""}">
+              <div class="card h-100 shadow-sm book-card">
+                <div class="book-cover-frame">
+                  <img
+                    src="${imageSrc}"
+                    class="book-cover"
+                    alt="Обложка книги ${book.title ?? ""}"
+                    style="border-radius: 0.75rem; -webkit-border-radius: 0.75rem;"
+                    onerror="this.style.display='none'"
+                  >
+                </div>
+                <div class="card-body">
+                  <h3 class="h6">${book.title ?? "-"}</h3>
+                  <p class="mb-1"><strong>Автор:</strong> ${book.author?.fullname ?? "-"}</p>
+                  <p class="mb-1"><strong>Жанр:</strong> ${book.genre ?? "-"}</p>
+                  <a href="/book/${book.id}/view" class="btn btn-outline-primary btn-sm mt-2 d-block mx-auto w-50 text-center">
+                    Перейти
+                  </a>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join("");
+
+        return `
+          <div class="books-slide ${slideIndex === activeSlideIndex ? "active" : ""}">
+            <div class="row g-3 justify-content-center">
+              ${cards}
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function showSlide(index) {
+      const slides = booksCarouselInner.querySelectorAll(".books-slide");
+      if (!slides.length) {
+        return;
+      }
+      activeSlideIndex = (index + slides.length) % slides.length;
+      slides.forEach((slide, slideIndex) => {
+        slide.classList.toggle("active", slideIndex === activeSlideIndex);
+      });
+    }
+
+    booksPrevBtn.addEventListener("click", () => {
+      showSlide(activeSlideIndex - 1);
+    });
+
+    booksNextBtn.addEventListener("click", () => {
+      showSlide(activeSlideIndex + 1);
+    });
+
+    booksCarousel.addEventListener("mousedown", (event) => {
+      dragStartX = event.clientX;
+      const mouseUpHandler = (upEvent) => {
+        const deltaX = upEvent.clientX - dragStartX;
+        if (Math.abs(deltaX) >= dragThresholdPx) {
+          showSlide(deltaX < 0 ? activeSlideIndex + 1 : activeSlideIndex - 1);
+        }
+        window.removeEventListener("mouseup", mouseUpHandler);
+      };
+      window.addEventListener("mouseup", mouseUpHandler);
+    });
+
+    booksCarousel.addEventListener("touchstart", (event) => {
+      if (!event.touches.length) {
+        return;
+      }
+      dragStartX = event.touches[0].clientX;
+    }, { passive: true });
+
+    booksCarousel.addEventListener("touchend", (event) => {
+      if (!event.changedTouches.length) {
+        return;
+      }
+      const deltaX = event.changedTouches[0].clientX - dragStartX;
+      if (Math.abs(deltaX) >= dragThresholdPx) {
+        showSlide(deltaX < 0 ? activeSlideIndex + 1 : activeSlideIndex - 1);
+      }
+    });
+
+    window.addEventListener("resize", () => {
+      if (cachedBooks.length > 0) {
+        renderBooks(cachedBooks);
+      }
+    });
+
+    function resolveBookImage(imageValue) {
+      if (!imageValue) {
+        return "/imgs/default-book.jpg";
+      }
+      if (imageValue.startsWith("http://") || imageValue.startsWith("https://") || imageValue.startsWith("/")) {
+        return imageValue;
+      }
+      return `/imgs/${imageValue}`;
+    }
+
+    function renderOrganisations(organisations) {
+      if (!Array.isArray(organisations) || organisations.length === 0) {
+        orgEmpty.classList.remove("d-none");
+        orgList.innerHTML = "";
+        return;
+      }
+
+      orgEmpty.classList.add("d-none");
+      orgList.innerHTML = organisations.map((item) => `
+        <div class="col-12 col-md-6 col-lg-4">
+          <article class="shelf-card h-100">
+            <div class="card-body">
+              <h3 class="h6">${item.name ?? "-"}</h3>
+              <p class="shelf-address mb-2">
+                <a class="text-decoration-none" href="/book/catalog/view?address=${encodeURIComponent(item.address ?? "")}">
+                  ${item.address ?? "-"}
+                </a>
+              </p>
+<!--              <p class="mb-0"><strong>Описание:</strong> ${item.description ?? "-"}</p>-->
+            </div>
+          </article>
+        </div>
+      `).join("");
+    }
+
+    async function loadMainData() {
+      // showResult("info", "Загрузка...", 0);
+      try {
+        const response = await fetch("/main", {
+          method: "GET",
+          headers: { "Accept": "application/json" }
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          // showResult("danger", data.detail ? String(data.detail) : "Ошибка загрузки главной страницы");
+          return;
+        }
+        renderHeader(data.user ?? null);
+        renderBooks(data.books ?? []);
+        renderOrganisations(data.organisations ?? []);
+        // showResult("success", "Данные обновлены");
+      } catch (error) {
+        // showResult("danger", "Не удалось загрузить данные");
+      }
+    }
+
+    loadMainData();
+  </script>
+</body>
+</html>

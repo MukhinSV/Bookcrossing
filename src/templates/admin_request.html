@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Заявка</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="bg-light d-flex flex-column">
+  <main class="container py-4 py-md-5 flex-grow-1">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+      <h1 class="h3 mb-0">Заявка</h1>
+      <a href="/admin/view" class="btn btn-outline-secondary">Назад в админку</a>
+    </div>
+
+    <div id="result" class="mb-3" role="status"></div>
+
+    <section class="card shadow-sm">
+      <div class="card-body" id="request-body">
+        <p class="text-muted mb-0">Загрузка...</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container py-4 small muted">
+      © Bookcrossing Admin
+    </div>
+  </footer>
+
+  <script src="/static/app.js"></script>
+  <script>
+    const result = document.getElementById("result");
+    const requestBody = document.getElementById("request-body");
+    let resultTimer;
+
+    function showResult(type, message, timeoutMs = 4000) {
+      clearTimeout(resultTimer);
+      result.className = `mb-3 alert alert-${type}`;
+      result.textContent = message;
+      if (timeoutMs > 0) {
+        resultTimer = setTimeout(() => {
+          result.className = "mb-3";
+          result.textContent = "";
+        }, timeoutMs);
+      }
+    }
+
+    function getRequestIdFromPath() {
+      const parts = window.location.pathname.split("/").filter(Boolean);
+      const idx = parts.indexOf("requests");
+      if (idx === -1 || idx + 1 >= parts.length) {
+        return null;
+      }
+      return Number(parts[idx + 1]);
+    }
+
+    async function loadRequest() {
+      const requestId = getRequestIdFromPath();
+      if (!requestId) {
+        showResult("danger", "Некорректный id заявки");
+        return;
+      }
+      try {
+        const [requestRes, metaRes] = await Promise.all([
+          fetch(`/admin/requests/${requestId}`, { headers: {"Accept": "application/json"} }),
+          fetch("/admin/meta", { headers: {"Accept": "application/json"} })
+        ]);
+        const requestData = await requestRes.json();
+        const metaData = await metaRes.json();
+        if (!requestRes.ok) {
+          showResult("danger", requestData.detail ? String(requestData.detail) : "Не удалось загрузить заявку");
+          return;
+        }
+        if (!metaRes.ok) {
+          showResult("danger", metaData.detail ? String(metaData.detail) : "Не удалось загрузить справочники");
+          return;
+        }
+        const options = (metaData.exchange_points ?? []).map((point) => `
+          <option value="${point.id}">${point.organisation?.address ?? "Адрес не указан"}</option>
+        `).join("");
+
+        requestBody.innerHTML = `
+          <h2 class="h5 mb-3">${requestData.title}</h2>
+          <p class="mb-1"><strong>Автор:</strong> ${requestData.author}</p>
+          <p class="mb-3"><strong>Адрес заявки:</strong> ${requestData.address}</p>
+          <div class="d-flex gap-2 mb-3">
+            <button id="reject-btn" type="button" class="btn btn-outline-danger">Отменить заявку</button>
+          </div>
+          <form id="approve-form" class="row g-2">
+            <div class="col-12 col-md-6">
+              <label class="form-label">Название книги</label>
+              <input id="title" type="text" class="form-control form-control-sm" value="${requestData.title ?? ""}">
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label">Автор</label>
+              <input id="author-fullname" type="text" class="form-control form-control-sm" value="${requestData.author ?? ""}">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">Адрес для instance</label>
+              <select id="exchange-point" class="form-select form-select-sm">${options}</select>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">Жанр</label>
+              <input id="genre" type="text" class="form-control form-control-sm">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">Год</label>
+              <input id="year" type="number" class="form-control form-control-sm">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">ISBN</label>
+              <input id="isbn" type="text" class="form-control form-control-sm">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">Страна автора</label>
+              <input id="author-country" type="text" class="form-control form-control-sm">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">Картинка</label>
+              <input id="image-file" type="file" class="form-control form-control-sm" accept="image/*">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Описание</label>
+              <textarea id="description" rows="2" class="form-control form-control-sm"></textarea>
+            </div>
+            <div class="col-12">
+              <button type="submit" class="btn btn-primary">Обработать и создать instance</button>
+            </div>
+          </form>
+        `;
+
+        document.getElementById("reject-btn").addEventListener("click", async () => {
+          const response = await fetch(`/admin/requests/${requestId}`, { method: "DELETE" });
+          const data = await response.json();
+          if (!response.ok) {
+            showResult("danger", data.detail ? String(data.detail) : "Не удалось удалить заявку");
+            return;
+          }
+          showResult("success", "Заявка удалена");
+          setTimeout(() => {
+            window.location.href = "/admin/view";
+          }, 500);
+        });
+
+        document.getElementById("approve-form").addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const formData = new FormData();
+          const title = document.getElementById("title").value;
+          const authorFullname = document.getElementById("author-fullname").value;
+          formData.set("exchange_point_id", document.getElementById("exchange-point").value);
+          if (title) formData.set("title", title);
+          if (authorFullname) formData.set("author_fullname", authorFullname);
+          const genre = document.getElementById("genre").value;
+          const year = document.getElementById("year").value;
+          const isbn = document.getElementById("isbn").value;
+          const country = document.getElementById("author-country").value;
+          const description = document.getElementById("description").value;
+          if (genre) formData.set("genre", genre);
+          if (year) formData.set("year", year);
+          if (isbn) formData.set("isbn", isbn);
+          if (country) formData.set("author_country", country);
+          if (description) formData.set("description", description);
+          const fileInput = document.getElementById("image-file");
+          if (fileInput.files && fileInput.files[0]) {
+            formData.set("image_file", fileInput.files[0]);
+          }
+
+          const response = await fetch(`/admin/requests/${requestId}/approve`, {
+            method: "POST",
+            body: formData
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            showResult("danger", data.detail ? String(data.detail) : "Не удалось обработать заявку");
+            return;
+          }
+          showResult("success", "Заявка обработана");
+          setTimeout(() => {
+            window.location.href = "/admin/view";
+          }, 500);
+        });
+      } catch (error) {
+        showResult("danger", "Ошибка загрузки");
+      }
+    }
+
+    loadRequest();
+  </script>
+</body>
+</html>

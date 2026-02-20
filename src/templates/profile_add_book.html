@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Добавить книгу</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <style>
+    body {
+      min-height: 100vh;
+    }
+    .site-footer {
+      background: var(--bg-solid);
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+    .site-footer .muted {
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body class="bg-light d-flex flex-column">
+  <main class="container py-4 py-md-5 flex-grow-1">
+    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+      <h1 class="h3 mb-0">Отдать книгу</h1>
+      <div class="d-flex gap-2" data-mobile-menu>
+        <a href="/profile/view" class="btn btn-outline-secondary">Назад в профиль</a>
+        <a href="/main/view" class="btn btn-outline-secondary">На главную</a>
+      </div>
+    </div>
+
+    <div id="result" class="mb-3" role="status"></div>
+
+    <section class="card shadow-sm">
+      <div class="card-body">
+        <form id="add-book-form" class="row g-3">
+          <div class="col-12 col-md-6">
+            <label for="title" class="form-label">Название книги</label>
+            <input id="title" type="text" class="form-control" required>
+          </div>
+          <div class="col-12 col-md-6">
+            <label for="author-fullname" class="form-label">Автор (fullname)</label>
+            <input id="author-fullname" type="text" class="form-control" required>
+          </div>
+          <div class="col-12">
+            <label for="exchange-point" class="form-label">Адрес размещения книги</label>
+            <select id="exchange-point" class="form-select" required></select>
+          </div>
+          <div class="col-12 d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Отдать</button>
+            <button id="reset-btn" type="button" class="btn btn-outline-secondary">Очистить</button>
+          </div>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container py-4 small muted">
+      © Bookcrossing. Читайте, делитесь, возвращайте книги в оборот.
+    </div>
+  </footer>
+
+  <script src="/static/app.js"></script>
+  <script>
+    const result = document.getElementById("result");
+    const addBookForm = document.getElementById("add-book-form");
+    const resetBtn = document.getElementById("reset-btn");
+    const exchangePointSelect = document.getElementById("exchange-point");
+    let resultTimer;
+
+    function showResult(type, message, timeoutMs = 4000) {
+      clearTimeout(resultTimer);
+      result.className = `mb-3 alert alert-${type}`;
+      result.textContent = message;
+      if (timeoutMs > 0) {
+        resultTimer = setTimeout(() => {
+          result.className = "mb-3";
+          result.textContent = "";
+        }, timeoutMs);
+      }
+    }
+
+    function fillExchangePoints(items) {
+      exchangePointSelect.innerHTML = "";
+      if (!Array.isArray(items) || items.length === 0) {
+        const option = document.createElement("option");
+        option.value = "";
+        option.textContent = "Нет доступных адресов";
+        exchangePointSelect.appendChild(option);
+        exchangePointSelect.disabled = true;
+        return;
+      }
+
+      exchangePointSelect.disabled = false;
+      items.forEach((point) => {
+        const option = document.createElement("option");
+        option.value = String(point.id);
+        option.textContent = point.organisation?.address ?? "Адрес не указан";
+        exchangePointSelect.appendChild(option);
+      });
+    }
+
+    async function loadContext() {
+      try {
+        const response = await fetch("/profile/add-book", {
+          method: "GET",
+          headers: {"Accept": "application/json"}
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          showResult("danger", data.detail ? String(data.detail) : "Не удалось загрузить адреса");
+          return;
+        }
+        fillExchangePoints(data.exchanges_point ?? []);
+      } catch (error) {
+        showResult("danger", "Ошибка загрузки данных");
+      }
+    }
+
+    addBookForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const payload = {
+        title: document.getElementById("title").value.trim(),
+        author_fullname: document.getElementById("author-fullname").value.trim(),
+        exchange_point_id: Number(exchangePointSelect.value)
+      };
+
+      if (!payload.title || !payload.author_fullname || !payload.exchange_point_id) {
+        showResult("danger", "Заполните обязательные поля");
+        return;
+      }
+
+      try {
+        const response = await fetch("/profile/add-book", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          showResult("danger", data.detail ? String(data.detail) : "Не удалось добавить книгу");
+          return;
+        }
+        showResult("success", "Книга успешно добавлена");
+        setTimeout(() => {
+          window.location.href = "/profile/view";
+        }, 250);
+      } catch (error) {
+        showResult("danger", "Ошибка запроса");
+      }
+    });
+
+    resetBtn.addEventListener("click", () => {
+      addBookForm.reset();
+    });
+
+    loadContext();
+  </script>
+</body>
+</html>

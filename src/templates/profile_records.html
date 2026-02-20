@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Записи профиля</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <style>
+    body {
+      min-height: 100vh;
+    }
+    .site-footer {
+      background: var(--bg-solid);
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+    .site-footer .muted {
+      color: var(--text-muted);
+    }
+    @media (max-width: 699.98px) {
+      #table-body td:last-child {
+        min-width: 84px;
+      }
+      .own-status-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        white-space: nowrap;
+        line-height: 1;
+        text-align: center;
+        padding: .12rem .34rem;
+        font-size: .62rem;
+      }
+    }
+  </style>
+</head>
+<body class="bg-light d-flex flex-column">
+  <main class="container py-4 py-md-5 flex-grow-1 d-flex flex-column">
+    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+      <h1 id="page-title" class="h3 mb-0">Записи</h1>
+      <div class="d-flex gap-2" data-mobile-menu>
+        <a href="/profile/view" class="btn btn-outline-secondary">Назад в профиль</a>
+        <a href="/main/view" class="btn btn-outline-secondary">На главную</a>
+      </div>
+    </div>
+
+    <div id="result" class="mb-3" role="status"></div>
+
+    <section class="card shadow-sm">
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead id="table-head"></thead>
+            <tbody id="table-body">
+              <tr><td class="text-muted">Нет данных</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <nav aria-label="Пагинация" class="mt-auto pt-1">
+      <ul id="pagination" class="pagination justify-content-center mb-0"></ul>
+      <div id="pagination-status" class="small text-muted text-center mt-2"></div>
+    </nav>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container py-4 small muted">
+      © Bookcrossing. Читайте, делитесь, возвращайте книги в оборот.
+    </div>
+  </footer>
+
+  <script src="/static/app.js"></script>
+  <script>
+    const pageTitle = document.getElementById("page-title");
+    const result = document.getElementById("result");
+    const tableHead = document.getElementById("table-head");
+    const tableBody = document.getElementById("table-body");
+    const pagination = document.getElementById("pagination");
+    const paginationStatus = document.getElementById("pagination-status");
+    let resultTimer;
+    let currentPage = 1;
+    let totalPages = 0;
+    let section = null;
+    let exchangePoints = [];
+
+    const sectionConfig = {
+      own: {
+        title: "Все записи: Отданные книги",
+        emptyColspan: 3,
+        headHtml: `
+          <tr>
+            <th>Название</th>
+            <th>Автор</th>
+            <th>Статус</th>
+          </tr>
+        `
+      },
+      rent: {
+        title: "Все записи: Взятые книги",
+        emptyColspan: 3,
+        headHtml: `
+          <tr>
+            <th>Название</th>
+            <th>Автор</th>
+            <th>Действия</th>
+          </tr>
+        `
+      },
+      booking: {
+        title: "Все записи: Бронирования",
+        emptyColspan: 2,
+        headHtml: `
+          <tr>
+            <th>Название</th>
+            <th>Действия</th>
+          </tr>
+        `
+      }
+    };
+
+    function showResult(type, message, timeoutMs = 4000) {
+      clearTimeout(resultTimer);
+      result.className = `mb-3 alert alert-${type}`;
+      result.textContent = message;
+      if (timeoutMs > 0) {
+        resultTimer = setTimeout(() => {
+          result.className = "mb-3";
+          result.textContent = "";
+        }, timeoutMs);
+      }
+    }
+
+    function getSectionFromPath() {
+      const parts = window.location.pathname.split("/").filter(Boolean);
+      const recordsIndex = parts.indexOf("records");
+      if (recordsIndex === -1 || recordsIndex + 1 >= parts.length) {
+        return null;
+      }
+      return parts[recordsIndex + 1];
+    }
+
+    function renderPagination() {
+      if (!totalPages || totalPages <= 0) {
+        pagination.innerHTML = "";
+        paginationStatus.textContent = "";
+        return;
+      }
+
+      const prevDisabled = currentPage <= 1 ? "disabled" : "";
+      const nextDisabled = currentPage >= totalPages ? "disabled" : "";
+      paginationStatus.textContent = `Страница ${currentPage} из ${totalPages}`;
+
+      pagination.innerHTML = `
+        <li class="page-item ${prevDisabled}">
+          <button class="page-link" data-page="${currentPage - 1}">Назад</button>
+        </li>
+        <li class="page-item disabled">
+          <span class="page-link">${currentPage}</span>
+        </li>
+        <li class="page-item ${nextDisabled}">
+          <button class="page-link" data-page="${currentPage + 1}">Вперед</button>
+        </li>
+      `;
+
+      pagination.querySelectorAll("button[data-page]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const nextPage = Number(button.dataset.page);
+          if (!nextPage || nextPage < 1 || nextPage > totalPages || nextPage === currentPage) {
+            return;
+          }
+          loadRecords(nextPage);
+        });
+      });
+    }
+
+    async function handleBookingAction(method, bookingId, successMessage) {
+      try {
+        const response = await fetch(`/profile/${bookingId}`, {method});
+        const data = await response.json();
+        if (!response.ok) {
+          showResult("danger", data.detail ? String(data.detail) : "Не удалось выполнить действие");
+          return;
+        }
+        showResult("success", successMessage);
+        await loadRecords(currentPage);
+      } catch (error) {
+        showResult("danger", "Ошибка запроса");
+      }
+    }
+
+    async function handleReturnBook(instanceId, exchangePointId) {
+      if (!exchangePointId) {
+        showResult("danger", "Выберите адрес возврата");
+        return;
+      }
+      try {
+        const response = await fetch(`/profile/return/${instanceId}`, {
+          method: "PATCH",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({exchange_point_id: exchangePointId})
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          showResult("danger", data.detail ? String(data.detail) : "Не удалось вернуть книгу");
+          return;
+        }
+        showResult("success", "Книга успешно возвращена");
+        await loadRecords(currentPage);
+      } catch (error) {
+        showResult("danger", "Ошибка запроса");
+      }
+    }
+
+    function renderOwn(items) {
+      tableBody.innerHTML = items.map((item) => `
+        <tr>
+          <td>${item.title ?? "-"}</td>
+          <td>${item.author ?? "-"}</td>
+          <td>${
+            item.pending
+              ? '<span class="badge text-bg-warning own-status-badge">В обработке</span>'
+              : '<span class="badge text-bg-success own-status-badge">Доступна</span>'
+          }</td>
+        </tr>
+      `).join("");
+    }
+
+    function renderRent(items) {
+      tableBody.innerHTML = items.map((item) => {
+        const selectOptions = exchangePoints.map((point) => `
+          <option value="${point.id}">
+            ${point.organisation?.address ?? "Адрес не указан"}
+          </option>
+        `).join("");
+        return `
+          <tr>
+            <td>${item.book?.title ?? "-"}</td>
+            <td>${item.book?.author?.fullname ?? "-"}</td>
+            <td>
+              <div class="d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-sm btn-outline-primary js-return-open" data-instance-id="${item.id}">
+                  Вернуть
+                </button>
+              </div>
+              <div class="d-none mt-2 js-return-form" data-instance-id="${item.id}">
+                <select class="form-select form-select-sm mb-2 js-return-select" data-instance-id="${item.id}">
+                  ${selectOptions}
+                </select>
+                <button type="button" class="btn btn-sm btn-success js-return-confirm" data-instance-id="${item.id}">
+                  Подтвердить возврат
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join("");
+
+      document.querySelectorAll(".js-return-open").forEach((button) => {
+        button.addEventListener("click", () => {
+          const instanceId = button.dataset.instanceId;
+          const form = document.querySelector(`.js-return-form[data-instance-id="${instanceId}"]`);
+          if (!form) {
+            return;
+          }
+          const isHidden = form.classList.contains("d-none");
+          document.querySelectorAll(".js-return-form").forEach((otherForm) => {
+            otherForm.classList.add("d-none");
+          });
+          document.querySelectorAll(".js-return-open").forEach((otherButton) => {
+            otherButton.textContent = "Вернуть";
+          });
+          if (isHidden) {
+            form.classList.remove("d-none");
+            button.textContent = "Скрыть";
+          } else {
+            form.classList.add("d-none");
+            button.textContent = "Вернуть";
+          }
+        });
+      });
+
+      document.querySelectorAll(".js-return-confirm").forEach((button) => {
+        button.addEventListener("click", () => {
+          const instanceId = Number(button.dataset.instanceId);
+          const select = document.querySelector(`.js-return-select[data-instance-id="${instanceId}"]`);
+          const exchangePointId = Number(select?.value);
+          handleReturnBook(instanceId, exchangePointId);
+        });
+      });
+    }
+
+    function renderBooking(items) {
+      tableBody.innerHTML = items.map((item) => `
+        <tr>
+          <td>${item.instance?.book?.title ?? "-"}</td>
+          <td>
+            <div class="d-flex flex-wrap gap-2">
+              <button type="button" class="btn btn-sm btn-success js-booking-picked" data-booking-id="${item.id}">
+                Уже забрал
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-danger js-booking-cancel" data-booking-id="${item.id}">
+                Отменить
+              </button>
+            </div>
+          </td>
+        </tr>
+      `).join("");
+
+      document.querySelectorAll(".js-booking-picked").forEach((button) => {
+        button.addEventListener("click", () => {
+          const bookingId = Number(button.dataset.bookingId);
+          handleBookingAction("PATCH", bookingId, "Книга отмечена как полученная");
+        });
+      });
+      document.querySelectorAll(".js-booking-cancel").forEach((button) => {
+        button.addEventListener("click", () => {
+          const bookingId = Number(button.dataset.bookingId);
+          handleBookingAction("DELETE", bookingId, "Бронирование отменено");
+        });
+      });
+    }
+
+    function renderItems(items) {
+      if (!Array.isArray(items) || items.length === 0) {
+        const config = sectionConfig[section];
+        tableBody.innerHTML = `<tr><td colspan="${config.emptyColspan}" class="text-muted">Нет данных</td></tr>`;
+        return;
+      }
+      if (section === "own") {
+        renderOwn(items);
+        return;
+      }
+      if (section === "rent") {
+        renderRent(items);
+        return;
+      }
+      renderBooking(items);
+    }
+
+    async function loadRecords(page = 1) {
+      try {
+        const response = await fetch(`/profile/records/${section}?page=${page}`, {
+          method: "GET",
+          headers: {"Accept": "application/json"}
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          showResult("danger", data.detail ? String(data.detail) : "Не удалось загрузить записи");
+          return;
+        }
+        exchangePoints = Array.isArray(data.exchanges_point) ? data.exchanges_point : [];
+        currentPage = data.page ?? 1;
+        totalPages = data.total_pages ?? 0;
+        renderItems(data.items ?? []);
+        renderPagination();
+      } catch (error) {
+        showResult("danger", "Ошибка загрузки записей");
+      }
+    }
+
+    section = getSectionFromPath();
+    if (!section || !sectionConfig[section]) {
+      showResult("danger", "Раздел не найден");
+    } else {
+      pageTitle.textContent = sectionConfig[section].title;
+      tableHead.innerHTML = sectionConfig[section].headHtml;
+      loadRecords(1);
+    }
+  </script>
+</body>
+</html>

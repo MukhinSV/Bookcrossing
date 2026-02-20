@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Адреса полок</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <style>
+    body {
+      min-height: 100vh;
+    }
+    .site-footer {
+      background: var(--bg-solid);
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+    .site-footer .muted {
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body class="bg-light d-flex flex-column">
+  <main class="container py-4 py-md-5 flex-grow-1 d-flex flex-column">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+      <h1 class="h3 mb-0">Все адреса полок</h1>
+      <a href="/main/view" class="btn btn-outline-secondary">На главную</a>
+    </div>
+
+    <form id="search-form" class="card shadow-sm mb-4">
+      <div class="card-body">
+        <label for="q" class="form-label">Поиск по организации или адресу</label>
+        <div class="d-flex gap-2 flex-wrap">
+          <input id="q" type="text" class="form-control" placeholder="Введите название или адрес">
+          <button type="submit" class="btn btn-primary">Искать</button>
+          <button id="clear-btn" type="button" class="btn btn-outline-secondary">Сбросить</button>
+        </div>
+      </div>
+    </form>
+
+    <div id="result" class="mb-3" role="status"></div>
+    <div id="empty" class="alert alert-secondary d-none">Адреса не найдены</div>
+    <div id="list" class="row g-3"></div>
+    <nav aria-label="Пагинация" class="mt-auto pt-1">
+      <ul id="pagination" class="pagination justify-content-center mb-0"></ul>
+      <div id="pagination-status" class="small text-muted text-center mt-2"></div>
+    </nav>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container py-4 small muted">
+      © Bookcrossing. Читайте, делитесь, возвращайте книги в оборот.
+    </div>
+  </footer>
+
+  <script src="/static/app.js"></script>
+  <script>
+    const searchForm = document.getElementById("search-form");
+    const clearBtn = document.getElementById("clear-btn");
+    const qInput = document.getElementById("q");
+    const result = document.getElementById("result");
+    const empty = document.getElementById("empty");
+    const list = document.getElementById("list");
+    const pagination = document.getElementById("pagination");
+    const paginationStatus = document.getElementById("pagination-status");
+    let resultTimer;
+    let currentPage = 1;
+    let totalPages = 0;
+
+    function showResult(type, message, timeoutMs = 3500) {
+      clearTimeout(resultTimer);
+      result.className = `mb-3 alert alert-${type}`;
+      result.textContent = message;
+      if (timeoutMs > 0) {
+        resultTimer = setTimeout(() => {
+          result.className = "mb-3";
+          result.textContent = "";
+        }, timeoutMs);
+      }
+    }
+
+    function buildCatalogLink(address) {
+      const params = new URLSearchParams();
+      params.set("address", address);
+      return `/book/catalog/view?${params.toString()}`;
+    }
+
+    function renderItems(items) {
+      if (!Array.isArray(items) || items.length === 0) {
+        empty.classList.remove("d-none");
+        list.innerHTML = "";
+        pagination.innerHTML = "";
+        paginationStatus.textContent = "";
+        return;
+      }
+
+      empty.classList.add("d-none");
+      list.innerHTML = items.map((item) => `
+        <div class="col-12 col-md-6 col-lg-4">
+          <article class="card h-100 shadow-sm">
+            <div class="card-body">
+              <h2 class="h6">${item.name ?? "-"}</h2>
+              <p class="mb-2">
+                <a href="${buildCatalogLink(item.address ?? "")}" class="link-primary text-decoration-none">
+                  ${item.address ?? "-"}
+                </a>
+              </p>
+              <p class="mb-0 text-muted">${item.description ?? ""}</p>
+            </div>
+          </article>
+        </div>
+      `).join("");
+    }
+
+    function renderPagination() {
+      if (!totalPages || totalPages <= 0) {
+        pagination.innerHTML = "";
+        paginationStatus.textContent = "";
+        return;
+      }
+
+      const prevDisabled = currentPage <= 1 ? "disabled" : "";
+      const nextDisabled = currentPage >= totalPages ? "disabled" : "";
+      paginationStatus.textContent = `Страница ${currentPage} из ${totalPages}`;
+
+      pagination.innerHTML = `
+        <li class="page-item ${prevDisabled}">
+          <button class="page-link" data-page="${currentPage - 1}">Назад</button>
+        </li>
+        <li class="page-item disabled">
+          <span class="page-link">${currentPage}</span>
+        </li>
+        <li class="page-item ${nextDisabled}">
+          <button class="page-link" data-page="${currentPage + 1}">Вперед</button>
+        </li>
+      `;
+
+      pagination.querySelectorAll("button[data-page]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const nextPage = Number(button.dataset.page);
+          if (!nextPage || nextPage < 1 || nextPage > totalPages || nextPage === currentPage) {
+            return;
+          }
+          loadItems(nextPage);
+        });
+      });
+    }
+
+    async function loadItems(page = 1) {
+      try {
+        const params = new URLSearchParams();
+        params.set("page", String(page));
+        const q = qInput.value.trim();
+        if (q) {
+          params.set("q", q);
+        }
+        const response = await fetch(`/main/shelves?${params.toString()}`, {
+          method: "GET",
+          headers: {"Accept": "application/json"}
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          showResult("danger", data.detail ? String(data.detail) : "Не удалось загрузить адреса");
+          return;
+        }
+        currentPage = data.page ?? 1;
+        totalPages = data.total_pages ?? 0;
+        renderItems(data.items ?? []);
+        renderPagination();
+      } catch (error) {
+        showResult("danger", "Ошибка загрузки адресов");
+      }
+    }
+
+    searchForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      loadItems(1);
+    });
+
+    clearBtn.addEventListener("click", () => {
+      qInput.value = "";
+      loadItems(1);
+    });
+
+    loadItems(1);
+  </script>
+</body>
+</html>

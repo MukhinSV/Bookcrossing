@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Вход</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <style>
+    body {
+      min-height: 100vh;
+      background: var(--bg);
+    }
+    .top-link {
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    .auth-card {
+      border: 1px solid var(--border);
+      border-radius: 1.25rem;
+      background: color-mix(in srgb, var(--surface) 90%, transparent);
+      backdrop-filter: blur(18px);
+      box-shadow: var(--shadow);
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <main class="container py-5">
+    <div class="row justify-content-center">
+      <div class="col-12 col-md-8 col-lg-5">
+        <div class="card auth-card">
+          <div class="card-body p-4">
+            <div class="mb-3">
+              <a href="/" class="text-decoration-none top-link">← На главную</a>
+            </div>
+            <h1 class="h4 mb-4">Вход в аккаунт</h1>
+
+            <form id="login-form" class="vstack gap-3">
+              <div>
+                <label for="email" class="form-label">Email</label>
+                <input type="email" class="form-control" id="email" required>
+              </div>
+              <div>
+                <label for="password" class="form-label">Пароль</label>
+                <input type="password" class="form-control" id="password" required>
+              </div>
+              <button type="submit" class="btn btn-primary">Войти</button>
+            </form>
+            <p class="mt-3 mb-0 text-muted">
+              Нет аккаунта?
+              <a href="/auth/register">Зарегистрироваться</a>
+            </p>
+
+            <div id="result" class="mt-3" role="status"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="/static/app.js"></script>
+  <script>
+    const form = document.getElementById("login-form");
+    const result = document.getElementById("result");
+    let resultTimer;
+
+    function showResult(type, message, timeoutMs = 4000) {
+      clearTimeout(resultTimer);
+      result.className = `mt-3 alert alert-${type}`;
+      result.textContent = message;
+      if (timeoutMs > 0) {
+        resultTimer = setTimeout(() => {
+          result.className = "mt-3";
+          result.textContent = "";
+        }, timeoutMs);
+      }
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      result.textContent = "";
+
+      const payload = {
+        email: document.getElementById("email").value.trim(),
+        password: document.getElementById("password").value
+      };
+
+      try {
+        const response = await fetch("/auth/login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          showResult("danger", data.detail ? String(data.detail) : "Ошибка входа");
+          return;
+        }
+
+        showResult("success", "Вход выполнен успешно");
+        form.reset();
+        setTimeout(() => {
+          window.location.href = "/";
+        }, 700);
+      } catch (error) {
+        showResult("danger", "Не удалось отправить запрос");
+      }
+    });
+  </script>
+</body>
+</html>

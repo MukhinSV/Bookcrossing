@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Все заявки</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="bg-light d-flex flex-column">
+  <main class="container py-4 py-md-5 flex-grow-1 d-flex flex-column">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+      <h1 class="h3 mb-0">Все заявки</h1>
+      <div class="d-flex gap-2" data-mobile-menu>
+        <a href="/admin/view" class="btn btn-outline-secondary">Админ-панель</a>
+        <a href="/main/view" class="btn btn-outline-secondary">На главную</a>
+      </div>
+    </div>
+
+    <div id="result" class="mb-3" role="status"></div>
+
+    <section class="card shadow-sm mb-4">
+      <div class="card-body">
+        <div class="row g-2">
+          <div class="col-12 col-md-8">
+            <label for="q" class="form-label">Фильтр</label>
+            <input id="q" class="form-control" placeholder="По title/author/address">
+          </div>
+          <div class="col-12 col-md-4 d-flex align-items-end gap-2 sp1">
+            <button id="apply-filter-btn" type="button" class="btn btn-primary">Применить</button>
+            <button id="reset-filter-btn" type="button" class="btn btn-outline-secondary">Сбросить</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div id="requests-empty" class="alert alert-secondary d-none">Заявок нет</div>
+    <div id="requests-list" class="vstack gap-3"></div>
+
+    <nav aria-label="Пагинация" class="mt-auto pt-1">
+      <ul id="pagination" class="pagination justify-content-center mb-0"></ul>
+      <div id="pagination-status" class="small text-muted text-center mt-2"></div>
+    </nav>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container py-4 small muted">
+      © Bookcrossing Admin
+    </div>
+  </footer>
+
+  <script src="/static/app.js"></script>
+  <script>
+    const result = document.getElementById("result");
+    const qInput = document.getElementById("q");
+    const applyFilterBtn = document.getElementById("apply-filter-btn");
+    const resetFilterBtn = document.getElementById("reset-filter-btn");
+    const requestsEmpty = document.getElementById("requests-empty");
+    const requestsList = document.getElementById("requests-list");
+    const pagination = document.getElementById("pagination");
+    const paginationStatus = document.getElementById("pagination-status");
+    let exchangePoints = [];
+    let resultTimer;
+    let currentPage = 1;
+    let totalPages = 0;
+
+    function showResult(type, message, timeoutMs = 4000) {
+      clearTimeout(resultTimer);
+      result.className = `mb-3 alert alert-${type}`;
+      result.textContent = message;
+      if (timeoutMs > 0) {
+        resultTimer = setTimeout(() => {
+          result.className = "mb-3";
+          result.textContent = "";
+        }, timeoutMs);
+      }
+    }
+
+    function renderPagination() {
+      if (!totalPages || totalPages <= 0) {
+        pagination.innerHTML = "";
+        paginationStatus.textContent = "";
+        return;
+      }
+      const prevDisabled = currentPage <= 1 ? "disabled" : "";
+      const nextDisabled = currentPage >= totalPages ? "disabled" : "";
+      paginationStatus.textContent = `Страница ${currentPage} из ${totalPages}`;
+      pagination.innerHTML = `
+        <li class="page-item ${prevDisabled}">
+          <button class="page-link" data-page="${currentPage - 1}">Назад</button>
+        </li>
+        <li class="page-item disabled"><span class="page-link">${currentPage}</span></li>
+        <li class="page-item ${nextDisabled}">
+          <button class="page-link" data-page="${currentPage + 1}">Вперед</button>
+        </li>
+      `;
+      pagination.querySelectorAll("button[data-page]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const nextPage = Number(button.dataset.page);
+          if (!nextPage || nextPage < 1 || nextPage > totalPages || nextPage === currentPage) return;
+          loadRequests(nextPage);
+        });
+      });
+    }
+
+    function renderRequests(items) {
+      if (!Array.isArray(items) || items.length === 0) {
+        requestsEmpty.classList.remove("d-none");
+        requestsList.innerHTML = "";
+        return;
+      }
+      requestsEmpty.classList.add("d-none");
+
+      const exchangeOptions = exchangePoints.map((point) => `
+        <option value="${point.id}">${point.organisation?.address ?? "Адрес не указан"}</option>
+      `).join("");
+
+      requestsList.innerHTML = items.map((item) => `
+        <article class="border rounded p-3 bg-white">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <div>
+              <div class="fw-semibold">${item.title}</div>
+              <div class="small text-muted">Автор: ${item.author}</div>
+              <div class="small text-muted">Адрес заявки: ${item.address}</div>
+            </div>
+            <div class="d-flex gap-2">
+              <a href="/admin/requests/${item.id}/view" class="btn btn-sm btn-outline-secondary">Открыть</a>
+              <button class="btn btn-sm btn-outline-danger js-request-delete" data-id="${item.id}">Отменить</button>
+            </div>
+          </div>
+          <button class="btn btn-sm btn-outline-primary mb-2 js-toggle-form" data-id="${item.id}">Показать форму</button>
+          <form class="row g-2 d-none js-approve-form" data-id="${item.id}">
+            <div class="col-12 col-md-6">
+              <label class="form-label">Название книги</label>
+              <input type="text" class="form-control form-control-sm js-title" value="${item.title ?? ""}">
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label">Автор</label>
+              <input type="text" class="form-control form-control-sm js-author" value="${item.author ?? ""}">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">Адрес для instance</label>
+              <select class="form-select form-select-sm js-exchange-point">${exchangeOptions}</select>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">Жанр</label>
+              <input type="text" class="form-control form-control-sm js-genre">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">Год</label>
+              <input type="number" class="form-control form-control-sm js-year">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">ISBN</label>
+              <input type="text" class="form-control form-control-sm js-isbn">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">Страна автора</label>
+              <input type="text" class="form-control form-control-sm js-author-country">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">Картинка</label>
+              <input type="file" class="form-control form-control-sm js-image-file" accept="image/*">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Описание</label>
+              <textarea class="form-control form-control-sm js-description" rows="2"></textarea>
+            </div>
+            <div class="col-12">
+              <button type="submit" class="btn btn-sm btn-primary">Обработать</button>
+            </div>
+          </form>
+        </article>
+      `).join("");
+
+      document.querySelectorAll(".js-toggle-form").forEach((button) => {
+        button.addEventListener("click", () => {
+          const id = button.dataset.id;
+          const form = document.querySelector(`.js-approve-form[data-id="${id}"]`);
+          if (!form) return;
+          const hidden = form.classList.contains("d-none");
+          form.classList.toggle("d-none", !hidden);
+          button.textContent = hidden ? "Скрыть форму" : "Показать форму";
+        });
+      });
+
+      document.querySelectorAll(".js-request-delete").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const id = Number(button.dataset.id);
+          const response = await fetch(`/admin/requests/${id}`, { method: "DELETE" });
+          const data = await response.json();
+          if (!response.ok) {
+            showResult("danger", data.detail ? String(data.detail) : "Не удалось удалить заявку");
+            return;
+          }
+          showResult("success", "Заявка удалена");
+          await loadRequests(currentPage);
+        });
+      });
+
+      document.querySelectorAll(".js-approve-form").forEach((form) => {
+        form.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const id = Number(form.dataset.id);
+          const formData = new FormData();
+          formData.set("exchange_point_id", form.querySelector(".js-exchange-point").value);
+          const title = form.querySelector(".js-title").value;
+          const author = form.querySelector(".js-author").value;
+          if (title) formData.set("title", title);
+          if (author) formData.set("author_fullname", author);
+          const genre = form.querySelector(".js-genre").value;
+          const year = form.querySelector(".js-year").value;
+          const isbn = form.querySelector(".js-isbn").value;
+          const authorCountry = form.querySelector(".js-author-country").value;
+          const description = form.querySelector(".js-description").value;
+          if (genre) formData.set("genre", genre);
+          if (year) formData.set("year", year);
+          if (isbn) formData.set("isbn", isbn);
+          if (authorCountry) formData.set("author_country", authorCountry);
+          if (description) formData.set("description", description);
+          const fileInput = form.querySelector(".js-image-file");
+          if (fileInput.files && fileInput.files[0]) {
+            formData.set("image_file", fileInput.files[0]);
+          }
+          const response = await fetch(`/admin/requests/${id}/approve`, { method: "POST", body: formData });
+          const data = await response.json();
+          if (!response.ok) {
+            showResult("danger", data.detail ? String(data.detail) : "Не удалось обработать заявку");
+            return;
+          }
+          showResult("success", "Заявка обработана");
+          await loadRequests(currentPage);
+        });
+      });
+    }
+
+    async function loadMeta() {
+      const response = await fetch("/admin/meta", { headers: {"Accept": "application/json"} });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail ? String(data.detail) : "Ошибка загрузки метаданных");
+      exchangePoints = Array.isArray(data.exchange_points) ? data.exchange_points : [];
+    }
+
+    async function loadRequests(page = 1) {
+      const params = new URLSearchParams();
+      params.set("page", String(page));
+      params.set("per_page", "10");
+      const q = qInput.value.trim();
+      if (q) params.set("q", q);
+      const response = await fetch(`/admin/requests?${params.toString()}`, { headers: {"Accept": "application/json"} });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail ? String(data.detail) : "Ошибка загрузки заявок");
+      currentPage = data.page ?? 1;
+      totalPages = data.total_pages ?? 0;
+      renderRequests(data.items || []);
+      renderPagination();
+    }
+
+    applyFilterBtn.addEventListener("click", () => {
+      loadRequests(1).catch((error) => showResult("danger", String(error.message || error)));
+    });
+    resetFilterBtn.addEventListener("click", () => {
+      qInput.value = "";
+      loadRequests(1).catch((error) => showResult("danger", String(error.message || error)));
+    });
+
+    (async () => {
+      try {
+        await loadMeta();
+        await loadRequests(1);
+      } catch (error) {
+        showResult("danger", String(error.message || error));
+      }
+    })();
+  </script>
+</body>
+</html>

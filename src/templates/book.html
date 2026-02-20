@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Книга</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <style>
+    body {
+      min-height: 100vh;
+    }
+    .book-cover {
+      width: 100%;
+      max-width: 220px;
+      height: auto;
+      object-fit: contain;
+      border-radius: 0.75rem;
+      border: 1px solid var(--border);
+      background: #fff;
+      display: block;
+      margin: 0 auto;
+    }
+    .site-footer {
+      background: var(--bg-solid);
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+    .site-footer .muted {
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body class="bg-light d-flex flex-column">
+  <main class="container py-4 py-md-5 flex-grow-1">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h1 class="h3 mb-0">Карточка книги</h1>
+      <div class="d-flex gap-2" data-mobile-menu>
+        <button id="back-btn" type="button" class="btn btn-outline-secondary">Назад</button>
+        <a href="/profile/view" class="btn btn-outline-primary">Личный кабинет</a>
+      </div>
+    </div>
+
+    <div id="result" class="mb-3" role="status"></div>
+
+    <section class="card shadow-sm mb-4">
+      <div class="card-body" id="book-info">
+        <p class="text-muted mb-0">Загрузка информации о книге...</p>
+      </div>
+    </section>
+
+    <section class="card shadow-sm">
+      <div class="card-header fw-semibold">Действия</div>
+      <div class="card-body">
+        <div id="actions-area"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container py-4 small muted">
+      © Bookcrossing. Читайте, делитесь, возвращайте книги в оборот.
+    </div>
+  </footer>
+
+  <script src="/static/app.js"></script>
+  <script>
+    const result = document.getElementById("result");
+    const bookInfo = document.getElementById("book-info");
+    const actionsArea = document.getElementById("actions-area");
+    const backBtn = document.getElementById("back-btn");
+    let resultTimer;
+    let contextData = null;
+
+    function getBookIdFromPath() {
+      const parts = window.location.pathname.split("/").filter(Boolean);
+      const bookIndex = parts.indexOf("book");
+      if (bookIndex === -1 || bookIndex + 1 >= parts.length) {
+        return null;
+      }
+      return Number(parts[bookIndex + 1]);
+    }
+
+    function showResult(type, message, timeoutMs = 4000) {
+      clearTimeout(resultTimer);
+      result.className = `mb-3 alert alert-${type}`;
+      result.textContent = message;
+      if (timeoutMs > 0) {
+        resultTimer = setTimeout(() => {
+          result.className = "mb-3";
+          result.textContent = "";
+        }, timeoutMs);
+      }
+    }
+
+    function renderBookInfo(book) {
+      if (!book) {
+        bookInfo.innerHTML = '<p class="text-danger mb-0">Книга не найдена</p>';
+        return;
+      }
+      const imageSrc = resolveBookImage(book.image);
+      bookInfo.innerHTML = `
+        <div class="row g-3 align-items-start">
+          <div class="col-12 col-md-auto">
+            <img src="${imageSrc}" alt="${book.title ?? "Обложка книги"}" class="book-cover">
+          </div>
+          <div class="col">
+            <h2 class="h5">${book.title ?? "-"}</h2>
+            <p class="mb-1"><strong>Автор:</strong> ${book.author?.fullname ?? "-"}</p>
+            <p class="mb-1"><strong>Жанр:</strong> ${book.genre ?? "-"}</p>
+            <p class="mb-1"><strong>Год:</strong> ${book.year ?? "-"}</p>
+            <p class="mb-0"><strong>Описание:</strong> ${book.description ?? "-"}</p>
+          </div>
+        </div>
+      `;
+    }
+
+    function resolveBookImage(imageValue) {
+      if (!imageValue) {
+        return "/imgs/default-book.jpg";
+      }
+      if (imageValue.startsWith("http://") || imageValue.startsWith("https://") || imageValue.startsWith("/")) {
+        return imageValue;
+      }
+      return `/imgs/${imageValue}`;
+    }
+
+    async function handleBooking(bookId, instanceId) {
+      try {
+        const response = await fetch(`/book/${bookId}/booking/${instanceId}`, {
+          method: "POST"
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          showResult("danger", data.detail ? String(data.detail) : "Не удалось забронировать книгу");
+          return;
+        }
+        showResult("success", "Книга успешно забронирована");
+        setTimeout(() => {
+          window.location.href = "/profile/view";
+        }, 700);
+      } catch (error) {
+        showResult("danger", "Ошибка запроса");
+      }
+    }
+
+    function renderActions(bookId, context) {
+      const instances = context.instances;
+      const booking = context.booking;
+      const exchangePoints = context.exchanges_point;
+
+      if (booking) {
+        actionsArea.innerHTML = `
+          <div class="alert alert-info mb-0">
+            Книга уже забронирована. Перейдите в личный кабинет.
+          </div>
+        `;
+        return;
+      }
+
+      if (!instances) {
+        actionsArea.innerHTML = `
+          <div class="alert alert-secondary mb-0">
+            Нет доступных книг
+          </div>
+        `;
+        return;
+      }
+
+      actionsArea.innerHTML = `
+        <button id="open-booking-form-btn" type="button" class="btn btn-primary">
+          Забронировать
+        </button>
+        <div id="booking-form" class="d-none">
+          <label for="exchange-select" class="form-label">Выберите адрес получения</label>
+          <select id="exchange-select" class="form-select mb-3"></select>
+          <button id="confirm-booking-btn" type="button" class="btn btn-success">
+            Подтвердить бронь
+          </button>
+        </div>
+      `;
+
+      const openBookingBtn = document.getElementById("open-booking-form-btn");
+      const bookingForm = document.getElementById("booking-form");
+      const exchangeSelect = document.getElementById("exchange-select");
+      const confirmBookingBtn = document.getElementById("confirm-booking-btn");
+
+      const points = Array.isArray(exchangePoints) ? exchangePoints : [];
+      const sourcePoints = points.length ? points : instances.map((instance) => ({
+        id: instance.exchange_point_id,
+        organisation: {address: "Адрес не указан"}
+      }));
+
+      sourcePoints.forEach((point) => {
+        const option = document.createElement("option");
+        option.value = String(point.id);
+        option.textContent = point.organisation?.address ?? "Адрес не указан";
+        exchangeSelect.appendChild(option);
+      });
+
+      openBookingBtn.addEventListener("click", () => {
+        const isHidden = bookingForm.classList.contains("d-none");
+        bookingForm.classList.toggle("d-none", !isHidden);
+        openBookingBtn.classList.toggle("mb-3", isHidden);
+        openBookingBtn.textContent = isHidden ? "Скрыть выбор адреса" : "Забронировать";
+      });
+
+      confirmBookingBtn.addEventListener("click", () => {
+        const selectedExchangePointId = Number(exchangeSelect.value);
+        const selectedInstance = instances.find((instance) => (
+          instance.exchange_point_id === selectedExchangePointId
+        )) ?? instances[0];
+
+        if (!selectedInstance) {
+          showResult("danger", "Свободных экземпляров не найдено");
+          return;
+        }
+
+        handleBooking(bookId, selectedInstance.id);
+      });
+    }
+
+    async function loadBookPage() {
+      const bookId = getBookIdFromPath();
+      if (!bookId) {
+        showResult("danger", "Некорректный идентификатор книги");
+        return;
+      }
+
+      // showResult("info", "Загрузка...", 0);
+      try {
+        const response = await fetch(`/book/${bookId}`, {
+          method: "GET",
+          headers: {"Accept": "application/json"}
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          // showResult("danger", data.detail ? String(data.detail) : "Не удалось загрузить данные");
+          return;
+        }
+
+        contextData = data;
+        renderBookInfo(data.book);
+        renderActions(bookId, data);
+        // showResult("success", "Данные загружены");
+      } catch (error) {
+        // showResult("danger", "Ошибка загрузки");
+      }
+    }
+
+    backBtn.addEventListener("click", () => {
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        window.location.href = "/main/view";
+      }
+    });
+
+    loadBookPage();
+  </script>
+</body>
+</html>

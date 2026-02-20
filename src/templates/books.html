@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Все книги</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <style>
+    body {
+      min-height: 100vh;
+    }
+    .book-cover-frame {
+      width: 100%;
+      aspect-ratio: 2 / 3;
+      border-radius: 0.75rem;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      background: #fff;
+    }
+    .book-cover {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .site-footer {
+      background: var(--bg-solid);
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+    .site-footer .muted {
+      color: var(--text-muted);
+    }
+    .card {
+      border-radius: 0.75rem;
+    }
+    .book-card {
+      max-width: 220px;
+      margin: 0 auto;
+    }
+    #books-grid {
+      row-gap: .9rem;
+    }
+  </style>
+</head>
+<body class="bg-light d-flex flex-column">
+  <main class="container py-4 py-md-5 flex-grow-1 d-flex flex-column">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+      <h1 class="h3 mb-0">Все книги</h1>
+      <a href="/" class="btn btn-outline-secondary">На главную</a>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+      <div class="card-body">
+        <form id="search-form" class="row g-2 align-items-end mb-3">
+          <div class="col-12 col-lg-8">
+            <label for="q" class="form-label">Поиск</label>
+            <input
+              id="q"
+              type="text"
+              class="form-control"
+              placeholder="Название, автор или ISBN"
+            >
+          </div>
+          <div class="col-12 col-sm-auto d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Искать</button>
+            <button id="toggle-filters-btn" type="button" class="btn btn-outline-primary">
+              Показать фильтры
+            </button>
+          </div>
+        </form>
+
+        <form id="filters-form" class="row g-2 d-none">
+          <div class="col-12 col-md-6 col-lg-3">
+            <label for="genre" class="form-label">Жанр</label>
+            <select id="genre" class="form-select">
+              <option value="">Все</option>
+            </select>
+          </div>
+          <div class="col-12 col-md-6 col-lg-3">
+            <label for="author" class="form-label">Автор</label>
+            <select id="author" class="form-select">
+              <option value="">Все</option>
+            </select>
+          </div>
+          <div class="col-12 col-md-6 col-lg-3">
+            <label for="year" class="form-label d-flex justify-content-between">
+              <span>Год от</span>
+              <span id="year-value" class="text-muted">Все</span>
+            </label>
+            <input id="year" type="range" class="form-range" disabled>
+          </div>
+          <div class="col-12 col-md-6 col-lg-3">
+            <label for="country" class="form-label">Страна</label>
+            <select id="country" class="form-select">
+              <option value="">Все</option>
+            </select>
+          </div>
+          <div class="col-12 col-md-6 col-lg-3">
+            <label for="address" class="form-label">Адрес полки</label>
+            <select id="address" class="form-select">
+              <option value="">Все</option>
+            </select>
+          </div>
+          <div class="col-12 d-flex gap-2 pt-1">
+            <button type="submit" class="btn btn-primary">Применить</button>
+            <button id="reset-filters-btn" type="button" class="btn btn-outline-secondary">Сбросить</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="result" class="mb-3" role="status"></div>
+    <div id="books-grid" class="row g-3"></div>
+    <div id="books-empty" class="alert alert-secondary d-none">Книги не найдены</div>
+
+    <nav aria-label="Пагинация" class="mt-auto pt-1">
+      <ul id="pagination" class="pagination justify-content-center mb-0"></ul>
+      <div id="pagination-status" class="small text-muted text-center mt-2"></div>
+    </nav>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container py-4 small muted">
+      © Bookcrossing. Читайте, делитесь, возвращайте книги в оборот.
+    </div>
+  </footer>
+
+  <script src="/static/app.js"></script>
+  <script>
+    const searchForm = document.getElementById("search-form");
+    const filtersForm = document.getElementById("filters-form");
+    const toggleFiltersBtn = document.getElementById("toggle-filters-btn");
+    const resetFiltersBtn = document.getElementById("reset-filters-btn");
+    const result = document.getElementById("result");
+    const booksGrid = document.getElementById("books-grid");
+    const booksEmpty = document.getElementById("books-empty");
+    const pagination = document.getElementById("pagination");
+    const paginationStatus = document.getElementById("pagination-status");
+    const qInput = document.getElementById("q");
+    const genreSelect = document.getElementById("genre");
+    const authorSelect = document.getElementById("author");
+    const yearRange = document.getElementById("year");
+    const yearValue = document.getElementById("year-value");
+    const countrySelect = document.getElementById("country");
+    const addressSelect = document.getElementById("address");
+
+    let resultTimer;
+    let currentPage = 1;
+    let totalPages = 0;
+    let filtersLoaded = false;
+    let yearTouched = false;
+    let yearMin = null;
+    let yearMax = null;
+    let initialAddressFilter = new URLSearchParams(window.location.search).get("address");
+
+    function showResult(type, message, timeoutMs = 3500) {
+      clearTimeout(resultTimer);
+      result.className = `mb-3 alert alert-${type}`;
+      result.textContent = message;
+      if (timeoutMs > 0) {
+        resultTimer = setTimeout(() => {
+          result.className = "mb-3";
+          result.textContent = "";
+        }, timeoutMs);
+      }
+    }
+
+    function resolveBookImage(imageValue) {
+      if (!imageValue) {
+        return "/imgs/default-book.jpg";
+      }
+      if (imageValue.startsWith("http://") || imageValue.startsWith("https://") || imageValue.startsWith("/")) {
+        return imageValue;
+      }
+      return `/imgs/${imageValue}`;
+    }
+
+    function getCurrentQueryParams(page) {
+      const params = new URLSearchParams();
+      params.set("page", String(page));
+      params.set("per_page", "6");
+
+      const q = qInput.value.trim();
+      const genre = genreSelect.value;
+      const authorId = authorSelect.value;
+      const year = yearRange.value;
+      const country = countrySelect.value;
+      const address = addressSelect.value || (initialAddressFilter && !filtersLoaded ? initialAddressFilter : "");
+
+      if (q) params.set("q", q);
+      if (genre) params.set("genre", genre);
+      if (authorId) params.set("author_id", authorId);
+      if (yearTouched && year) params.set("year", year);
+      if (country) params.set("country", country);
+      if (address) params.set("address", address);
+
+      return params;
+    }
+
+    function fillSelectOptions(selectElement, items, valueKey, labelKey) {
+      const keepValue = selectElement.value;
+      selectElement.innerHTML = '<option value="">Все</option>';
+      items.forEach((item) => {
+        const option = document.createElement("option");
+        option.value = String(item[valueKey]);
+        option.textContent = String(item[labelKey]);
+        selectElement.appendChild(option);
+      });
+      if (keepValue && Array.from(selectElement.options).some((opt) => opt.value === keepValue)) {
+        selectElement.value = keepValue;
+      }
+    }
+
+    function renderBooks(items) {
+      if (!Array.isArray(items) || items.length === 0) {
+        booksGrid.innerHTML = "";
+        booksEmpty.classList.remove("d-none");
+        return;
+      }
+      booksEmpty.classList.add("d-none");
+      booksGrid.innerHTML = items.map((book) => {
+        const imageSrc = resolveBookImage(book.image);
+        return `
+          <div class="col-12 col-sm-6 col-md-4 col-lg-3 col-xxl-2">
+            <div class="card h-100 shadow-sm book-card">
+              <div class="book-cover-frame">
+                <img
+                  src="${imageSrc}"
+                  class="book-cover"
+                  alt="Обложка книги ${book.title ?? ""}"
+                  onerror="this.src='/imgs/default-book.jpg'"
+                >
+              </div>
+              <div class="card-body d-flex flex-column">
+                <h2 class="h6 mb-2">${book.title ?? "-"}</h2>
+                <p class="text-muted mb-3">${book.author?.fullname ?? "-"}</p>
+                <a href="/book/${book.id}/view" class="btn btn-sm btn-outline-primary mt-auto">Перейти</a>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderPagination() {
+      if (!totalPages || totalPages <= 0) {
+        pagination.innerHTML = "";
+        paginationStatus.textContent = "";
+        return;
+      }
+
+      const prevDisabled = currentPage <= 1 ? "disabled" : "";
+      const nextDisabled = currentPage >= totalPages ? "disabled" : "";
+
+      paginationStatus.textContent = `Страница ${currentPage} из ${totalPages}`;
+
+      const pagesHtml = `
+        <li class="page-item ${prevDisabled}">
+          <button class="page-link" data-page="${currentPage - 1}">Назад</button>
+        </li>
+        <li class="page-item disabled">
+          <span class="page-link">${currentPage}</span>
+        </li>
+        <li class="page-item ${nextDisabled}">
+          <button class="page-link" data-page="${currentPage + 1}">Вперед</button>
+        </li>
+      `;
+
+      pagination.innerHTML = pagesHtml;
+
+      pagination.querySelectorAll("button[data-page]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const nextPage = Number(button.dataset.page);
+          if (!nextPage || nextPage < 1 || nextPage > totalPages || nextPage === currentPage) {
+            return;
+          }
+          loadBooks(nextPage);
+        });
+      });
+    }
+
+    function renderFilterControls(filters) {
+      if (!filters || filtersLoaded) {
+        return;
+      }
+
+      const genres = Array.isArray(filters.genres) ? filters.genres : [];
+      const years = Array.isArray(filters.years) ? filters.years : [];
+      const authors = Array.isArray(filters.authors) ? filters.authors : [];
+      const countries = Array.isArray(filters.countries) ? filters.countries : [];
+      const addresses = Array.isArray(filters.addresses) ? filters.addresses : [];
+
+      fillSelectOptions(
+        genreSelect,
+        genres.map((value) => ({value})),
+        "value",
+        "value"
+      );
+      fillSelectOptions(authorSelect, authors, "id", "fullname");
+      if (years.length > 0) {
+        yearMin = Math.min(...years);
+        yearMax = Math.max(...years);
+        yearRange.min = String(yearMin);
+        yearRange.max = String(yearMax);
+        yearRange.value = String(yearMax);
+        yearRange.disabled = false;
+        yearTouched = false;
+        yearValue.textContent = "Все";
+      } else {
+        yearRange.disabled = true;
+        yearRange.value = "0";
+        yearTouched = false;
+        yearMin = null;
+        yearMax = null;
+        yearValue.textContent = "Все";
+      }
+      fillSelectOptions(
+        countrySelect,
+        countries.map((value) => ({value})),
+        "value",
+        "value"
+      );
+      fillSelectOptions(
+        addressSelect,
+        addresses.map((value) => ({value})),
+        "value",
+        "value"
+      );
+
+      if (initialAddressFilter && Array.from(addressSelect.options).some((opt) => opt.value === initialAddressFilter)) {
+        addressSelect.value = initialAddressFilter;
+        initialAddressFilter = null;
+      }
+      filtersLoaded = true;
+    }
+
+    async function loadBooks(page = 1) {
+      const params = getCurrentQueryParams(page);
+      try {
+        const response = await fetch(`/book/catalog?${params.toString()}`, {
+          method: "GET",
+          headers: {"Accept": "application/json"}
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          showResult("danger", data.detail ? String(data.detail) : "Не удалось загрузить каталог");
+          return;
+        }
+
+        currentPage = data.page ?? 1;
+        totalPages = data.total_pages ?? 0;
+
+        renderFilterControls(data.filters);
+        renderBooks(data.items);
+        renderPagination();
+      } catch (error) {
+        showResult("danger", "Ошибка загрузки каталога");
+      }
+    }
+
+    searchForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      loadBooks(1);
+    });
+
+    filtersForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      loadBooks(1);
+    });
+
+    toggleFiltersBtn.addEventListener("click", () => {
+      const isHidden = filtersForm.classList.contains("d-none");
+      filtersForm.classList.toggle("d-none", !isHidden);
+      toggleFiltersBtn.textContent = isHidden ? "Скрыть фильтры" : "Показать фильтры";
+    });
+
+    yearRange.addEventListener("input", () => {
+      yearTouched = true;
+      yearValue.textContent = `от ${yearRange.value}`;
+    });
+
+    resetFiltersBtn.addEventListener("click", () => {
+      qInput.value = "";
+      genreSelect.value = "";
+      authorSelect.value = "";
+      countrySelect.value = "";
+      addressSelect.value = "";
+      initialAddressFilter = null;
+      yearTouched = false;
+      if (yearMin !== null && yearMax !== null) {
+        yearRange.value = String(yearMax);
+      }
+      yearValue.textContent = "Все";
+      loadBooks(1);
+    });
+
+    loadBooks(1);
+  </script>
+</body>
+</html>

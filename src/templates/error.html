@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ошибка</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <style>
+    body {
+      min-height: 100vh;
+      background: var(--bg);
+    }
+    .error-wrap {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 1rem;
+    }
+    .error-card {
+      width: 100%;
+      max-width: 640px;
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      background: #fff;
+      box-shadow: 0 10px 24px rgba(16, 24, 40, 0.08);
+    }
+  </style>
+</head>
+<body>
+  <div class="error-wrap">
+    <section class="error-card p-4 p-md-5">
+      <p class="text-muted mb-2">Код ошибки: __STATUS_CODE__</p>
+      <h1 class="h3 mb-3">__TITLE__</h1>
+      <p class="mb-4">__DETAIL__</p>
+      <div class="d-flex gap-2 flex-wrap">
+        <button type="button" class="btn btn-outline-secondary" onclick="window.history.back()">Назад</button>
+        <a href="/main/view" class="btn btn-primary">На главную</a>
+      </div>
+    </section>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
