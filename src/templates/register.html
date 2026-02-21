@@ -110,11 +110,10 @@
           return;
         }
 
-        showResult("success", "Код подтверждения отправлен на почту");
+        showResult("success", "Пользователь успешно зарегистрирован");
         form.reset();
         setTimeout(() => {
-          const email = encodeURIComponent(payload.email);
-          window.location.href = `/auth/verify-email/view?email=${email}`;
+          window.location.href = "/";
         }, 700);
       } catch (error) {
         showResult("danger", "Не удалось отправить запрос");
