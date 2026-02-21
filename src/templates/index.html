@@ -83,10 +83,14 @@
     .news-card h3 {
       margin-bottom: 0;
     }
-    .book-card { min-height: 260px; }
+    .book-card {
+      min-height: 220px;
+      max-width: 220px;
+      margin: 0 auto;
+    }
     .book-cover-frame {
       margin: 0.75rem auto 0;
-      width: 44%;
+      width: 40%;
       border: 1px solid var(--border);
       border-radius: 12px;
       overflow: hidden;
@@ -129,13 +133,10 @@
       height: 100%;
       object-fit: cover;
     }
-    #books-carousel.books-single .book-card {
-      max-width: 280px;
-      margin-inline: auto;
-      min-height: 220px;
-    }
-    #books-carousel.books-single .book-cover-frame {
-      width: 52%;
+    #books-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: .9rem;
     }
     .news-badge {
       display: inline-block;
@@ -161,6 +162,16 @@
     }
     .site-footer .muted { color: var(--text-muted); }
     @media (max-width: 699.98px) {
+      #books-grid {
+        grid-template-columns: 1fr;
+      }
+      .book-card {
+        max-width: 100%;
+        min-height: 0;
+      }
+      .book-cover-frame {
+        width: 34%;
+      }
       #header-actions {
         width: 100%;
         display: flex;
@@ -208,13 +219,7 @@
         <a href="/book/catalog/view" class="btn btn-sm btn-outline-primary">Открыть каталог</a>
       </div>
       <div id="books-empty" class="alert alert-secondary d-none mb-0">Каталог пока пуст.</div>
-      <div id="books-carousel" class="books-slider d-none" aria-live="polite">
-        <div id="books-carousel-inner" class="books-slider-inner"></div>
-        <div class="books-slider-controls">
-          <button id="books-prev-btn" class="books-slider-btn" type="button" aria-label="Предыдущий слайд">←</button>
-          <button id="books-next-btn" class="books-slider-btn" type="button" aria-label="Следующий слайд">→</button>
-        </div>
-      </div>
+      <div id="books-grid" class="row g-3"></div>
     </section>
 
     <section class="news-section mb-5">
@@ -271,15 +276,10 @@
     const headerActions = document.getElementById("header-actions");
     const globalResult = document.getElementById("global-result");
     const booksEmpty = document.getElementById("books-empty");
-    const booksCarousel = document.getElementById("books-carousel");
-    const booksCarouselInner = document.getElementById("books-carousel-inner");
-    const booksPrevBtn = document.getElementById("books-prev-btn");
-    const booksNextBtn = document.getElementById("books-next-btn");
+    const booksGrid = document.getElementById("books-grid");
     const orgEmpty = document.getElementById("org-empty");
     const orgList = document.getElementById("org-list");
     let resultTimer;
-    let cachedBooks = [];
-    let activeSlideIndex = 0;
 
     function showResult(type, message, timeoutMs = 4000) {
       clearTimeout(resultTimer);
@@ -321,82 +321,40 @@
       });
     }
 
-    function getBooksPerSlide() {
-      if (window.innerWidth >= 992) {
-        return 3;
-      }
-      if (window.innerWidth >= 768) {
-        return 2;
-      }
-      return 1;
-    }
-
-    function chunkArray(items, size) {
-      const chunks = [];
-      for (let index = 0; index < items.length; index += size) {
-        chunks.push(items.slice(index, index + size));
-      }
-      return chunks;
-    }
-
     function renderBooks(books) {
       if (!Array.isArray(books) || books.length === 0) {
         booksEmpty.classList.remove("d-none");
-        booksCarousel.classList.add("d-none");
-        return;
-      }
-
-      cachedBooks = books;
-      if (cachedBooks.length === 0) {
-        booksEmpty.classList.remove("d-none");
-        booksCarousel.classList.add("d-none");
+        booksGrid.innerHTML = "";
         return;
       }
 
       booksEmpty.classList.add("d-none");
-      booksCarousel.classList.remove("d-none");
-
-      const booksPerSlide = getBooksPerSlide();
-      const slides = chunkArray(cachedBooks, booksPerSlide);
-      activeSlideIndex = Math.min(activeSlideIndex, Math.max(slides.length - 1, 0));
-      booksCarousel.classList.toggle("books-single", booksPerSlide === 1);
-
-      booksCarouselInner.innerHTML = slides.map((slide, slideIndex) => {
-        const cards = slide.map((book) => {
-          const imageSrc = resolveBookImage(book.image);
-          const statusBadge = getBookStatusBadge(book);
-          return `
-            <div class="col-12 ${booksPerSlide > 1 ? "col-md-6" : ""} ${booksPerSlide > 2 ? "col-lg-4" : ""}">
-              <div class="card h-100 shadow-sm book-card">
-                <div class="book-cover-frame">
-                  <img
-                    src="${imageSrc}"
-                    class="book-cover"
-                    alt="Обложка книги ${book.title ?? ""}"
-                    style="border-radius: 0.75rem; -webkit-border-radius: 0.75rem;"
-                    onerror="this.style.display='none'"
-                  >
-                </div>
-                <div class="card-body">
-                  <div class="book-title-row">
-                    <h3 class="h6 mb-0">${book.title ?? "-"}</h3>
-                    ${statusBadge}
-                  </div>
-                  <p class="mb-1"><strong>Автор:</strong> ${book.author?.fullname ?? "-"}</p>
-                  <p class="mb-1"><strong>Жанр:</strong> ${book.genre ?? "-"}</p>
-                  <a href="/book/${book.id}/view" class="btn btn-outline-primary btn-sm mt-2 d-block mx-auto w-50 text-center">
-                    Перейти
-                  </a>
-                </div>
-              </div>
-            </div>
-          `;
-        }).join("");
-
+      booksGrid.innerHTML = books.slice(0, 3).map((book) => {
+        const imageSrc = resolveBookImage(book.image);
+        const statusBadge = getBookStatusBadge(book);
         return `
-          <div class="books-slide ${slideIndex === activeSlideIndex ? "active" : ""}">
-            <div class="row g-3 justify-content-center">
-              ${cards}
+          <div>
+            <div class="card h-100 shadow-sm book-card">
+              <div class="book-cover-frame">
+                <img
+                  src="${imageSrc}"
+                  class="book-cover"
+                  alt="Обложка книги ${book.title ?? ""}"
+                  style="border-radius: 0.75rem; -webkit-border-radius: 0.75rem;"
+                  onerror="this.style.display='none'"
+                >
+              </div>
+              <div class="card-body">
+                <div class="book-title-row">
+                  <h3 class="h6 mb-0">${book.title ?? "-"}</h3>
+                  ${statusBadge}
+                </div>
+                <p class="mb-1"><strong>Автор:</strong> ${book.author?.fullname ?? "-"}</p>
+                <p class="mb-1"><strong>Жанр:</strong> ${book.genre ?? "-"}</p>
+                <a href="/book/${book.id}/view" class="btn btn-outline-primary btn-sm mt-2 d-block mx-auto w-50 text-center">
+                  Перейти
+                </a>
+              </div>
             </div>
           </div>
         `;
@@ -412,31 +370,6 @@
       }
       return "";
     }
-
-    function showSlide(index) {
-      const slides = booksCarouselInner.querySelectorAll(".books-slide");
-      if (!slides.length) {
-        return;
-      }
-      activeSlideIndex = (index + slides.length) % slides.length;
-      slides.forEach((slide, slideIndex) => {
-        slide.classList.toggle("active", slideIndex === activeSlideIndex);
-      });
-    }
-
-    booksPrevBtn.addEventListener("click", () => {
-      showSlide(activeSlideIndex - 1);
-    });
-
-    booksNextBtn.addEventListener("click", () => {
-      showSlide(activeSlideIndex + 1);
-    });
-
-    window.addEventListener("resize", () => {
-      if (cachedBooks.length > 0) {
-        renderBooks(cachedBooks);
-      }
-    });
 
     function resolveBookImage(imageValue) {
       if (!imageValue) {
