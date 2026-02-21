@@ -79,20 +79,19 @@ async def verify_email_page():
 
 
 @router.post("/register", summary="Регистрация")
-async def register(db: DBDep, user_data: UserAddRequest):
+async def register(db: DBDep, user_data: UserAddRequest, response: Response):
     hashed_password = AuthService().hash_password(user_data.password)
     add_payload = UserAdd(**user_data.model_dump(), hashed_password=hashed_password)
     try:
         user = await db.user.add(add_payload)
     except HTTPException:
         raise HTTPException(status_code=401, detail="Пользователь с таким логином уже существует")
-    await set_email_verification_code(db, user.id, str(user.email))
+
+    # ВРЕМЕННО отключено подтверждение email:
+    # await set_email_verification_code(db, user.id, str(user.email))
     await db.commit()
-    return {
-        "status": "verification_required",
-        "email": user.email,
-        "detail": "Мы отправили 4-значный код на вашу почту",
-    }
+    access_token = AuthService().add_token(user, response)
+    return {"access_token": access_token}
 
 
 @router.post("/login", summary="Войти")
@@ -103,17 +102,18 @@ async def login(db: DBDep, user_data: UserLogin, response: Response):
     if not AuthService().verify_password(user_data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Пароль не верный")
 
-    if not user.email_verified:
-        await set_email_verification_code(db, user.id, str(user.email))
-        await db.commit()
-        return JSONResponse(
-            status_code=403,
-            content={
-                "detail": "Email не подтвержден. Мы отправили новый код.",
-                "verification_required": True,
-                "email": user.email,
-            },
-        )
+    # ВРЕМЕННО отключено подтверждение email:
+    # if not user.email_verified:
+    #     await set_email_verification_code(db, user.id, str(user.email))
+    #     await db.commit()
+    #     return JSONResponse(
+    #         status_code=403,
+    #         content={
+    #             "detail": "Email не подтвержден. Мы отправили новый код.",
+    #             "verification_required": True,
+    #             "email": user.email,
+    #         },
+    #     )
 
     access_token = AuthService().add_token(user, response)
     return {"access_token": access_token}
