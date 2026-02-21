@@ -12,3 +12,5 @@ class UserORM(Base):
     email: Mapped[str] = mapped_column(unique=True)
     hashed_password: Mapped[str]
     role: Mapped[str]
+    email_verified: Mapped[bool] = mapped_column(default=False)
+    email_verification_code: Mapped[str | None]

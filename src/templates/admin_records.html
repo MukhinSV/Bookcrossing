@@ -8,6 +8,23 @@
   <style>
     .json-box { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
     .create-form-wrap { border-top: 1px solid var(--border); padding-top: .9rem; }
+    .create-form-wrap input[type="date"],
+    .create-form-wrap input[type="datetime-local"] {
+      width: 100%;
+      min-width: 0;
+    }
+    @media (max-width: 699.98px) {
+      .create-form-wrap input[type="date"],
+      .create-form-wrap input[type="datetime-local"] {
+        min-height: 2.5rem;
+        font-size: 16px;
+        padding-right: .55rem;
+      }
+      .create-form-wrap input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+      .create-form-wrap input[type="date"]::-webkit-calendar-picker-indicator {
+        margin-left: .35rem;
+      }
+    }
   </style>
 </head>
 <body class="bg-light d-flex flex-column">
@@ -251,6 +268,26 @@
               >
                 <option value="">Выберите точку</option>
                 ${options}
+              </select>
+            </div>
+          `;
+        }
+
+        if (currentTable === "instance" && column.name === "status") {
+          return `
+            <div class="col-12 col-md-6">
+              <label class="form-label" for="create-${column.name}">${column.name}${hint}</label>
+              <select
+                id="create-${column.name}"
+                data-name="${column.name}"
+                data-type="${column.type}"
+                class="form-select form-select-sm"
+                ${requiredAttr}
+              >
+                <option value="">Выберите статус</option>
+                <option value="FREE">FREE</option>
+                <option value="BOOKED">BOOKED</option>
+                <option value="OWNED">OWNED</option>
               </select>
             </div>
           `;

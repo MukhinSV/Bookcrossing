@@ -32,6 +32,17 @@
         font-size: .62rem;
       }
     }
+    .booking-address-btn {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--primary);
+      text-align: left;
+      font-size: .9rem;
+      line-height: 1.2;
+      text-decoration: underline;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body class="bg-light">
@@ -137,11 +148,12 @@
             <thead>
               <tr>
                 <th>Название</th>
+                <th>Адрес</th>
                 <th>Действия</th>
               </tr>
             </thead>
             <tbody id="booking-body">
-              <tr><td colspan="2" class="text-muted">Нет данных</td></tr>
+              <tr><td colspan="3" class="text-muted">Нет данных</td></tr>
             </tbody>
           </table>
         </div>
@@ -344,14 +356,28 @@
 
     function renderBookings(items) {
       if (!Array.isArray(items) || items.length === 0) {
-        bookingBody.innerHTML = '<tr><td colspan="2" class="text-muted">Нет данных</td></tr>';
+        bookingBody.innerHTML = '<tr><td colspan="3" class="text-muted">Нет данных</td></tr>';
         return;
       }
 
       bookingBody.innerHTML = items.map((item) => {
+        const pointId = item.instance?.exchange_point_id;
+        const point = exchangePoints.find((exchangePoint) => exchangePoint.id === pointId);
+        const address = point?.address ?? "Адрес не указан";
+        const shortAddress = address.length > 24 ? `${address.slice(0, 24)}...` : address;
         return `
           <tr>
             <td>${item.instance?.book?.title ?? "-"}</td>
+            <td>
+              <button
+                type="button"
+                class="booking-address-btn js-address-toggle"
+                data-short="${shortAddress}"
+                data-full="${address}"
+                aria-expanded="false"
+                title="Показать полный адрес"
+              >${shortAddress}</button>
+            </td>
             <td>
               <div class="d-flex flex-wrap gap-2">
                 <button type="button" class="btn btn-sm btn-success js-booking-picked" data-booking-id="${item.id}">
@@ -377,6 +403,21 @@
         button.addEventListener("click", () => {
           const bookingId = Number(button.dataset.bookingId);
           handleBookingAction("DELETE", bookingId, "Бронирование отменено");
+        });
+      });
+
+      document.querySelectorAll(".js-address-toggle").forEach((button) => {
+        button.addEventListener("click", () => {
+          const expanded = button.getAttribute("aria-expanded") === "true";
+          if (expanded) {
+            button.textContent = button.dataset.short || "";
+            button.setAttribute("aria-expanded", "false");
+            button.setAttribute("title", "Показать полный адрес");
+          } else {
+            button.textContent = button.dataset.full || "";
+            button.setAttribute("aria-expanded", "true");
+            button.setAttribute("title", "Скрыть полный адрес");
+          }
         });
       });
     }

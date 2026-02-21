@@ -96,6 +96,13 @@
         const data = await response.json();
 
         if (!response.ok) {
+          if (response.status === 403 && data.verification_required && data.email) {
+            showResult("warning", data.detail ? String(data.detail) : "Требуется подтверждение email");
+            setTimeout(() => {
+              window.location.href = `/auth/verify-email/view?email=${encodeURIComponent(data.email)}`;
+            }, 700);
+            return;
+          }
           showResult("danger", data.detail ? String(data.detail) : "Ошибка входа");
           return;
         }

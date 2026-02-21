@@ -22,16 +22,27 @@ class User(BaseModel):
     lastname: str
     email: EmailStr
     role: str
+    email_verified: bool = False
     model_config = ConfigDict(from_attributes=True)
 
 
 class UserWithHashedPassword(User):
     hashed_password: str
+    email_verification_code: str | None = None
 
 
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+
+
+class VerifyEmailCodeRequest(BaseModel):
+    email: EmailStr
+    code: str
+
+
+class ResendEmailCodeRequest(BaseModel):
+    email: EmailStr
 
 
 class UserPatch(BaseModel):

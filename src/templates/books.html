@@ -16,6 +16,7 @@
       border: 1px solid var(--border);
       overflow: hidden;
       background: #fff;
+      position: relative;
     }
     .book-cover {
       width: 100%;
@@ -39,6 +40,31 @@
     }
     #books-grid {
       row-gap: .9rem;
+    }
+    .book-status-badge {
+      position: absolute;
+      top: .45rem;
+      right: .45rem;
+      width: 1.85rem;
+      height: 1.85rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      font-size: 1.02rem;
+      font-weight: 800;
+      line-height: 1;
+      border: 2px solid rgba(255, 255, 255, .95);
+      box-shadow: 0 6px 14px rgba(0, 0, 0, .22);
+      text-shadow: 0 1px 1px rgba(0, 0, 0, .25);
+    }
+    .book-status-badge.booked {
+      color: #fff;
+      background: #2563eb;
+    }
+    .book-status-badge.owned {
+      color: #fff;
+      background: #16a34a;
     }
   </style>
 </head>
@@ -220,10 +246,12 @@
       booksEmpty.classList.add("d-none");
       booksGrid.innerHTML = items.map((book) => {
         const imageSrc = resolveBookImage(book.image);
+        const statusBadge = getBookStatusBadge(book);
         return `
           <div class="col-12 col-sm-6 col-md-4 col-lg-3 col-xxl-2">
             <div class="card h-100 shadow-sm book-card">
               <div class="book-cover-frame">
+                ${statusBadge}
                 <img
                   src="${imageSrc}"
                   class="book-cover"
@@ -240,6 +268,16 @@
           </div>
         `;
       }).join("");
+    }
+
+    function getBookStatusBadge(book) {
+      if (book?.is_booked_by_user) {
+        return '<span class="book-status-badge booked" title="Книга забронирована вами" aria-label="Книга забронирована вами">🔖</span>';
+      }
+      if (book?.is_owned_by_user) {
+        return '<span class="book-status-badge owned" title="Книга у вас" aria-label="Книга у вас">✓</span>';
+      }
+      return "";
     }
 
     function renderPagination() {

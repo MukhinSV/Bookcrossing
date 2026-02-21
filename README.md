@@ -62,6 +62,14 @@ DB_PASS=root
 JWT_SECRET_KEY=change_me
 JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_HOURS=24
+
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=mailer@example.com
+SMTP_PASS=change_me
+SMTP_FROM=mailer@example.com
+SMTP_STARTTLS=true
+SMTP_SSL=false
 ```
 
 ### 3) Применить миграции

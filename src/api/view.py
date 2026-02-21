@@ -14,6 +14,36 @@ INDEX_TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "templates" / "index
 SHELVES_TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "templates" / "shelves.html"
 
 
+async def enrich_books_with_user_flags(db: DBDep, books: list, user_id: int | None):
+    books_payload = [book.model_dump() for book in books]
+    if not books_payload:
+        return books_payload
+
+    booked_ids = set()
+    owned_ids = set()
+    available_book_ids = {book["id"] for book in books_payload}
+
+    if user_id:
+        bookings = await db.booking.get_all(user_id=user_id)
+        booked_ids = {
+            booking.book_id
+            for booking in bookings
+            if booking.book_id in available_book_ids
+        }
+        instances = await db.instance.get_all(user_id=user_id)
+        owned_ids = {
+            instance.book_id
+            for instance in instances
+            if instance.status == "OWNED" and instance.book_id in available_book_ids
+        }
+
+    for book in books_payload:
+        book_id = book["id"]
+        book["is_booked_by_user"] = book_id in booked_ids
+        book["is_owned_by_user"] = book_id in owned_ids
+    return books_payload
+
+
 @router.get("/view", summary="HTML главная страница", response_class=HTMLResponse)
 async def main_view_page():
     return FileResponse(INDEX_TEMPLATE_PATH)
@@ -35,6 +65,8 @@ async def main_page(db: DBDep, request: Request):
         except Exception:
             user = None
     books = await db.book.get_all()
+    user_id = user.id if user else None
+    books_payload = await enrich_books_with_user_flags(db, books, user_id)
     exchange_points = await db.exchange_point.get_all()
     organisations = [
         {
@@ -45,7 +77,7 @@ async def main_page(db: DBDep, request: Request):
         }
         for point in exchange_points
     ]
-    context = {"user": user, "books": books[:9], "organisations": organisations[:3]}
+    context = {"user": user, "books": books_payload[:9], "organisations": organisations[:3]}
     return context
 
 

@@ -92,6 +92,36 @@
       overflow: hidden;
       background: var(--surface);
       aspect-ratio: 2 / 3;
+      position: relative;
+    }
+    .book-title-row {
+      display: flex;
+      align-items: center;
+      gap: .45rem;
+      justify-content: flex-start;
+    }
+    .book-status-badge {
+      width: 1.6rem;
+      height: 1.6rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      font-size: .92rem;
+      font-weight: 800;
+      line-height: 1;
+      border: 2px solid rgba(255, 255, 255, .95);
+      box-shadow: 0 6px 14px rgba(0, 0, 0, .22);
+      text-shadow: 0 1px 1px rgba(0, 0, 0, .25);
+      flex-shrink: 0;
+    }
+    .book-status-badge.booked {
+      color: #fff;
+      background: #2563eb;
+    }
+    .book-status-badge.owned {
+      color: #fff;
+      background: #16a34a;
     }
     .book-cover {
       display: block;
@@ -250,8 +280,6 @@
     let resultTimer;
     let cachedBooks = [];
     let activeSlideIndex = 0;
-    let dragStartX = 0;
-    const dragThresholdPx = 40;
 
     function showResult(type, message, timeoutMs = 4000) {
       clearTimeout(resultTimer);
@@ -336,6 +364,7 @@
       booksCarouselInner.innerHTML = slides.map((slide, slideIndex) => {
         const cards = slide.map((book) => {
           const imageSrc = resolveBookImage(book.image);
+          const statusBadge = getBookStatusBadge(book);
           return `
             <div class="col-12 ${booksPerSlide > 1 ? "col-md-6" : ""} ${booksPerSlide > 2 ? "col-lg-4" : ""}">
               <div class="card h-100 shadow-sm book-card">
@@ -349,7 +378,10 @@
                   >
                 </div>
                 <div class="card-body">
-                  <h3 class="h6">${book.title ?? "-"}</h3>
+                  <div class="book-title-row">
+                    <h3 class="h6 mb-0">${book.title ?? "-"}</h3>
+                    ${statusBadge}
+                  </div>
                   <p class="mb-1"><strong>Автор:</strong> ${book.author?.fullname ?? "-"}</p>
                   <p class="mb-1"><strong>Жанр:</strong> ${book.genre ?? "-"}</p>
                   <a href="/book/${book.id}/view" class="btn btn-outline-primary btn-sm mt-2 d-block mx-auto w-50 text-center">
@@ -371,6 +403,16 @@
       }).join("");
     }
 
+    function getBookStatusBadge(book) {
+      if (book?.is_booked_by_user) {
+        return '<span class="book-status-badge booked" title="Книга забронирована вами" aria-label="Книга забронирована вами">🔖</span>';
+      }
+      if (book?.is_owned_by_user) {
+        return '<span class="book-status-badge owned" title="Книга у вас" aria-label="Книга у вас">✓</span>';
+      }
+      return "";
+    }
+
     function showSlide(index) {
       const slides = booksCarouselInner.querySelectorAll(".books-slide");
       if (!slides.length) {
@@ -388,35 +430,6 @@
 
     booksNextBtn.addEventListener("click", () => {
       showSlide(activeSlideIndex + 1);
-    });
-
-    booksCarousel.addEventListener("mousedown", (event) => {
-      dragStartX = event.clientX;
-      const mouseUpHandler = (upEvent) => {
-        const deltaX = upEvent.clientX - dragStartX;
-        if (Math.abs(deltaX) >= dragThresholdPx) {
-          showSlide(deltaX < 0 ? activeSlideIndex + 1 : activeSlideIndex - 1);
-        }
-        window.removeEventListener("mouseup", mouseUpHandler);
-      };
-      window.addEventListener("mouseup", mouseUpHandler);
-    });
-
-    booksCarousel.addEventListener("touchstart", (event) => {
-      if (!event.touches.length) {
-        return;
-      }
-      dragStartX = event.touches[0].clientX;
-    }, { passive: true });
-
-    booksCarousel.addEventListener("touchend", (event) => {
-      if (!event.changedTouches.length) {
-        return;
-      }
-      const deltaX = event.changedTouches[0].clientX - dragStartX;
-      if (Math.abs(deltaX) >= dragThresholdPx) {
-        showSlide(deltaX < 0 ? activeSlideIndex + 1 : activeSlideIndex - 1);
-      }
     });
 
     window.addEventListener("resize", () => {

@@ -25,14 +25,9 @@ from src.models.new_added_instance import NewAddedInstanceORM
 # access to the values within the .ini file in use.
 config = context.config
 
-DATABASE_URL = settings.DATABASE_URL.replace(
-    "postgresql://",
-    "postgresql+asyncpg://"
-)
-
 config.set_main_option(
     "sqlalchemy.url",
-    f"{DATABASE_URL}?async_fallback=true",
+    f"{settings.DB_URL}?async_fallback=true",
 )
 
 # Interpret the config file for Python logging.

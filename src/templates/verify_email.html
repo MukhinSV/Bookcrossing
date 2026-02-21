@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Подтверждение Email</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <style>
+    body {
+      min-height: 100vh;
+      background: var(--bg);
+    }
+    .top-link {
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    .auth-card {
+      border: 1px solid var(--border);
+      border-radius: 1.25rem;
+      background: color-mix(in srgb, var(--surface) 90%, transparent);
+      backdrop-filter: blur(18px);
+      box-shadow: var(--shadow);
+    }
+    .code-input {
+      text-align: center;
+      font-size: 1.2rem;
+      letter-spacing: .45rem;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <main class="container py-5">
+    <div class="row justify-content-center">
+      <div class="col-12 col-md-8 col-lg-5">
+        <div class="card auth-card">
+          <div class="card-body p-4">
+            <div class="mb-3">
+              <a href="/auth/login" class="text-decoration-none top-link">← Ко входу</a>
+            </div>
+            <h1 class="h4 mb-3">Подтверждение Email</h1>
+            <p class="text-muted mb-3">
+              Мы отправили 4-значный код на почту:
+              <strong id="email-value">—</strong>
+            </p>
+
+            <form id="verify-form" class="vstack gap-3">
+              <div>
+                <label for="code" class="form-label">Код из письма</label>
+                <input id="code" type="text" class="form-control code-input" inputmode="numeric" maxlength="4" required>
+              </div>
+              <button type="submit" class="btn btn-primary">Подтвердить</button>
+              <button id="resend-btn" type="button" class="btn btn-outline-secondary">Отправить код повторно</button>
+            </form>
+
+            <div id="result" class="mt-3" role="status"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="/static/app.js"></script>
+  <script>
+    const form = document.getElementById("verify-form");
+    const resendBtn = document.getElementById("resend-btn");
+    const codeInput = document.getElementById("code");
+    const result = document.getElementById("result");
+    const emailValue = document.getElementById("email-value");
+    const email = new URLSearchParams(window.location.search).get("email") || "";
+    let resultTimer;
+
+    emailValue.textContent = email || "—";
+
+    function showResult(type, message, timeoutMs = 4000) {
+      clearTimeout(resultTimer);
+      result.className = `mt-3 alert alert-${type}`;
+      result.textContent = message;
+      if (timeoutMs > 0) {
+        resultTimer = setTimeout(() => {
+          result.className = "mt-3";
+          result.textContent = "";
+        }, timeoutMs);
+      }
+    }
+
+    codeInput.addEventListener("input", () => {
+      codeInput.value = codeInput.value.replace(/\D/g, "").slice(0, 4);
+    });
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!email) {
+        showResult("danger", "Email не передан");
+        return;
+      }
+      const code = codeInput.value.trim();
+      if (code.length !== 4) {
+        showResult("danger", "Введите 4 цифры кода");
+        return;
+      }
+
+      const response = await fetch("/auth/verify-email", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({email, code})
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        showResult("danger", data.detail ? String(data.detail) : "Не удалось подтвердить email");
+        return;
+      }
+      showResult("success", "Email подтвержден");
+      setTimeout(() => {
+        window.location.href = "/";
+      }, 600);
+    });
+
+    resendBtn.addEventListener("click", async () => {
+      if (!email) {
+        showResult("danger", "Email не передан");
+        return;
+      }
+      const response = await fetch("/auth/verify-email/resend", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({email})
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        showResult("danger", data.detail ? String(data.detail) : "Не удалось отправить код");
+        return;
+      }
+      showResult("success", data.detail ? String(data.detail) : "Код отправлен повторно");
+    });
+  </script>
+</body>
+</html>
