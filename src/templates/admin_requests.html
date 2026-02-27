@@ -98,6 +98,7 @@
         button.addEventListener("click", () => {
           const nextPage = Number(button.dataset.page);
           if (!nextPage || nextPage < 1 || nextPage > totalPages || nextPage === currentPage) return;
+          window.scrollTo({ top: 0, behavior: "smooth" });
           loadRequests(nextPage);
         });
       });
