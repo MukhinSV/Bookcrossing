@@ -22,6 +22,7 @@ from src.api.profile import router as profile_router
 from src.api.view import router as view_router
 from src.api.book import router as book_router
 from src.api.admin import router as admin_router
+from src.init import redis_manager
 
 
 async def lifespan(app: FastAPI):
