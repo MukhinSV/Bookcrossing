@@ -3,6 +3,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Request, HTTPException
 from starlette.responses import HTMLResponse, FileResponse
+from fastapi_cache.decorator import cache
 
 from src.dependencies.db_dep import DBDep
 from src.dependencies.user_dep import PayloadDep
@@ -46,11 +47,13 @@ async def enrich_books_with_user_flags(db: DBDep, books: list, user_id: int | No
 
 
 @router.get("/catalog/view", summary="HTML страница каталога", response_class=HTMLResponse)
+@cache(expire=20)
 async def books_catalog_view_page():
     return FileResponse(BOOKS_TEMPLATE_PATH)
 
 
 @router.get("/catalog", summary="Каталог книг с фильтрами и пагинацией")
+@cache(expire=20)
 async def books_catalog(
     db: DBDep,
     request: Request,
@@ -104,11 +107,13 @@ async def books_catalog(
 
 
 @router.get("/{book_id}/view", summary="HTML страница книги", response_class=HTMLResponse)
+@cache(expire=20)
 async def book_view_page(book_id: int):
     return FileResponse(BOOK_TEMPLATE_PATH)
 
 
 @router.get("/{book_id}", summary="Получить книгу")
+@cache(expire=20)
 async def get_book(book_id: int, db: DBDep, request: Request):
     user = None
     payload = None
