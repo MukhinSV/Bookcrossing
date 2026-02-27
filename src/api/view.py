@@ -56,7 +56,6 @@ async def shelves_view_page():
 
 
 @router.get("", summary="Контекст главной страницы")
-@cache(expire=20)
 async def main_page(db: DBDep, request: Request):
     user = None
     access_token = request.cookies.get("access_token")
