@@ -46,13 +46,11 @@ async def enrich_books_with_user_flags(db: DBDep, books: list, user_id: int | No
 
 
 @router.get("/view", summary="HTML главная страница", response_class=HTMLResponse)
-@cache(expire=20)
 async def main_view_page():
     return FileResponse(INDEX_TEMPLATE_PATH)
 
 
 @router.get("/shelves/view", summary="HTML адреса полок", response_class=HTMLResponse)
-@cache(expire=20)
 async def shelves_view_page():
     return FileResponse(SHELVES_TEMPLATE_PATH)
 
