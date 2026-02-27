@@ -1,4 +1,5 @@
 import uvicorn
+from contextlib import asynccontextmanager
 from html import escape
 
 from fastapi import FastAPI, Request
@@ -6,6 +7,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from fastapi_cache import FastAPICache
+from fastapi_cache.backends.redis import RedisBackend
 
 import sys
 from pathlib import Path
@@ -20,7 +23,15 @@ from src.api.view import router as view_router
 from src.api.book import router as book_router
 from src.api.admin import router as admin_router
 
-app = FastAPI()
+
+async def lifespan(app: FastAPI):
+    await redis_manager.connect()
+    FastAPICache.init(RedisBackend(redis_manager.redis), prefix="fastapi_cache")
+    yield
+    await redis_manager.close()
+
+
+app = FastAPI(lifespan=lifespan)
 app.include_router(auth_router)
 app.include_router(profile_router)
 app.include_router(view_router)
