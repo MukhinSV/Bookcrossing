@@ -108,7 +108,6 @@ async def get_profile_records(section: str, db: DBDep, payload: PayloadDep):
     response_class=HTMLResponse,
     summary="HTML страница профиля"
 )
-@cache(expire=20)
 async def profile_view_page():
     return FileResponse(PROFILE_TEMPLATE_PATH)
 
@@ -140,7 +139,6 @@ async def profile_page(db: DBDep, payload: PayloadDep):
 
 @router.get("/records/{section}/view", response_class=HTMLResponse,
             summary="HTML страница записей профиля")
-@cache(expire=20)
 async def profile_records_view_page(section: str):
     if section not in {"own", "rent", "booking"}:
         raise HTTPException(status_code=404, detail="Раздел не найден")
@@ -149,7 +147,6 @@ async def profile_records_view_page(section: str):
 
 @router.get("/add-book/view", response_class=HTMLResponse,
             summary="HTML страница добавления книги")
-@cache(expire=20)
 async def profile_add_book_view_page():
     return FileResponse(PROFILE_ADD_BOOK_TEMPLATE_PATH)
 
