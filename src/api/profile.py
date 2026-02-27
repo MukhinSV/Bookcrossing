@@ -113,7 +113,6 @@ async def profile_view_page():
 
 
 @router.get("", summary="Страница профиля")
-@cache(expire=20)
 async def profile_page(db: DBDep, payload: PayloadDep):
     user = await db.user.get_one_or_none(id=payload["user_id"])
     if not user:
@@ -152,7 +151,7 @@ async def profile_add_book_view_page():
 
 
 @router.get("/add-book", summary="Контекст страницы добавления книги")
-@cache(expire=20)
+@cache(expire=10)
 async def profile_add_book_page(db: DBDep, payload: PayloadDep):
     user = await db.user.get_one_or_none(id=payload["user_id"])
     if not user:
@@ -187,7 +186,7 @@ async def profile_add_book(payload: PayloadDep, db: DBDep, data: ProfileAddBookR
 
 
 @router.get("/records/{section}", summary="Записи профиля с пагинацией")
-@cache(expire=20)
+@cache(expire=10)
 async def profile_records_page(section: str, db: DBDep, payload: PayloadDep, page: int = 1):
     records_data = await get_profile_records(section, db, payload)
     paginated_items, page, per_page, total, total_pages = paginate(records_data["items"], page=page, per_page=10)
