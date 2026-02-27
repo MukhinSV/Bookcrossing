@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from starlette.responses import HTMLResponse, FileResponse
+from fastapi_cache.decorator import cache
 
 from src.dependencies.db_dep import DBDep
 from src.dependencies.user_dep import PayloadDep
@@ -107,11 +108,13 @@ async def get_profile_records(section: str, db: DBDep, payload: PayloadDep):
     response_class=HTMLResponse,
     summary="HTML страница профиля"
 )
+@cache(expire=20)
 async def profile_view_page():
     return FileResponse(PROFILE_TEMPLATE_PATH)
 
 
 @router.get("", summary="Страница профиля")
+@cache(expire=20)
 async def profile_page(db: DBDep, payload: PayloadDep):
     user = await db.user.get_one_or_none(id=payload["user_id"])
     if not user:
@@ -137,6 +140,7 @@ async def profile_page(db: DBDep, payload: PayloadDep):
 
 @router.get("/records/{section}/view", response_class=HTMLResponse,
             summary="HTML страница записей профиля")
+@cache(expire=20)
 async def profile_records_view_page(section: str):
     if section not in {"own", "rent", "booking"}:
         raise HTTPException(status_code=404, detail="Раздел не найден")
@@ -145,11 +149,13 @@ async def profile_records_view_page(section: str):
 
 @router.get("/add-book/view", response_class=HTMLResponse,
             summary="HTML страница добавления книги")
+@cache(expire=20)
 async def profile_add_book_view_page():
     return FileResponse(PROFILE_ADD_BOOK_TEMPLATE_PATH)
 
 
 @router.get("/add-book", summary="Контекст страницы добавления книги")
+@cache(expire=20)
 async def profile_add_book_page(db: DBDep, payload: PayloadDep):
     user = await db.user.get_one_or_none(id=payload["user_id"])
     if not user:
@@ -184,6 +190,7 @@ async def profile_add_book(payload: PayloadDep, db: DBDep, data: ProfileAddBookR
 
 
 @router.get("/records/{section}", summary="Записи профиля с пагинацией")
+@cache(expire=20)
 async def profile_records_page(section: str, db: DBDep, payload: PayloadDep, page: int = 1):
     records_data = await get_profile_records(section, db, payload)
     paginated_items, page, per_page, total, total_pages = paginate(records_data["items"], page=page, per_page=10)
