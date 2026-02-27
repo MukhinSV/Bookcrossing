@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Request
 from sqlalchemy import select, update, delete, func, or_
 from starlette.responses import HTMLResponse, FileResponse
+from fastapi_cache.decorator import cache
 
 from src.dependencies.db_dep import DBDep
 from src.models.author import AuthorORM
@@ -150,42 +151,49 @@ def build_table_filters(model, query: str | None):
 
 
 @router.get("/view", response_class=HTMLResponse, summary="HTML админка")
+@cache(expire=10)
 async def admin_view_page(request: Request):
     get_admin_payload_or_404(request)
     return FileResponse(ADMIN_TEMPLATE_PATH)
 
 
 @router.get("", response_class=HTMLResponse, summary="HTML админка")
+@cache(expire=10)
 async def admin_root_page(request: Request):
     get_admin_payload_or_404(request)
     return FileResponse(ADMIN_TEMPLATE_PATH)
 
 
 @router.get("/requests/{request_id}/view", response_class=HTMLResponse, summary="HTML страница заявки")
+@cache(expire=10)
 async def admin_request_view_page(request_id: int, request: Request):
     get_admin_payload_or_404(request)
     return FileResponse(ADMIN_REQUEST_TEMPLATE_PATH)
 
 
 @router.get("/requests/view", response_class=HTMLResponse, summary="HTML список заявок")
+@cache(expire=10)
 async def admin_requests_view_page(request: Request):
     get_admin_payload_or_404(request)
     return FileResponse(ADMIN_REQUESTS_TEMPLATE_PATH)
 
 
 @router.get("/records/view", response_class=HTMLResponse, summary="HTML редактор записей")
+@cache(expire=10)
 async def admin_records_view_page(request: Request):
     get_admin_payload_or_404(request)
     return FileResponse(ADMIN_RECORDS_TEMPLATE_PATH)
 
 
 @router.get("/stats", response_class=HTMLResponse, summary="HTML статистика")
+@cache(expire=10)
 async def admin_stats_view_page(request: Request):
     get_admin_payload_or_404(request)
     return FileResponse(ADMIN_STATS_TEMPLATE_PATH)
 
 
 @router.get("/stats/data", summary="Данные статистики")
+@cache(expire=10)
 async def admin_stats_data(db: DBDep, request: Request):
     get_admin_payload_or_404(request)
 
@@ -210,6 +218,7 @@ async def admin_stats_data(db: DBDep, request: Request):
 
 
 @router.get("/meta", summary="Метаданные админки")
+@cache(expire=10)
 async def admin_meta(db: DBDep, request: Request):
     get_admin_payload_or_404(request)
     exchanges = await db.exchange_point.get_all()
@@ -248,6 +257,7 @@ async def admin_meta(db: DBDep, request: Request):
 
 
 @router.get("/requests", summary="Заявки new_added_instance")
+@cache(expire=10)
 async def admin_requests(db: DBDep, request: Request, page: int = 1, per_page: int = 10, q: str | None = None):
     get_admin_payload_or_404(request)
     rows = await db.new_added_instance.get_all()
@@ -269,6 +279,7 @@ async def admin_requests(db: DBDep, request: Request, page: int = 1, per_page: i
 
 
 @router.get("/requests/{request_id}", summary="Заявка по id")
+@cache(expire=10)
 async def admin_request_by_id(request_id: int, db: DBDep, request: Request):
     get_admin_payload_or_404(request)
     row = await db.new_added_instance.get_one_or_none(id=request_id)
@@ -380,6 +391,7 @@ async def admin_approve_request(
 
 
 @router.get("/table/{table_name}", summary="Данные таблицы")
+@cache(expire=10)
 async def admin_table_get(
     table_name: str,
     db: DBDep,
