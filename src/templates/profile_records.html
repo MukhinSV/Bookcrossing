@@ -171,6 +171,7 @@
           if (!nextPage || nextPage < 1 || nextPage > totalPages || nextPage === currentPage) {
             return;
           }
+          window.scrollTo({ top: 0, behavior: "smooth" });
           loadRecords(nextPage);
         });
       });
