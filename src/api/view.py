@@ -3,6 +3,7 @@ from pathlib import Path
 from fastapi import APIRouter, Request
 from sqlalchemy import or_, select, func
 from starlette.responses import HTMLResponse, FileResponse
+from fastapi_cache.decorator import cache
 
 from src.dependencies.db_dep import DBDep
 from src.models.exchange_point import ExchangePointORM
@@ -45,16 +46,19 @@ async def enrich_books_with_user_flags(db: DBDep, books: list, user_id: int | No
 
 
 @router.get("/view", summary="HTML главная страница", response_class=HTMLResponse)
+@cache(expire=20)
 async def main_view_page():
     return FileResponse(INDEX_TEMPLATE_PATH)
 
 
 @router.get("/shelves/view", summary="HTML адреса полок", response_class=HTMLResponse)
+@cache(expire=20)
 async def shelves_view_page():
     return FileResponse(SHELVES_TEMPLATE_PATH)
 
 
 @router.get("", summary="Контекст главной страницы")
+@cache(expire=20)
 async def main_page(db: DBDep, request: Request):
     user = None
     access_token = request.cookies.get("access_token")
@@ -82,6 +86,7 @@ async def main_page(db: DBDep, request: Request):
 
 
 @router.get("/shelves", summary="Все адреса полок")
+@cache(expire=20)
 async def shelves_page(db: DBDep, q: str | None = None, page: int = 1):
     page = max(page, 1)
     per_page = 10
