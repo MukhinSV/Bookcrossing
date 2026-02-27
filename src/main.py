@@ -25,6 +25,18 @@ from src.api.admin import router as admin_router
 from src.init import redis_manager
 
 
+class CachedImagesStaticFiles(StaticFiles):
+    def __init__(self, *args, cache_control: str = "public, max-age=2592000, immutable", **kwargs):
+        super().__init__(*args, **kwargs)
+        self.cache_control = cache_control
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        if "cache-control" not in response.headers:
+            response.headers["Cache-Control"] = self.cache_control
+        return response
+
+
 async def lifespan(app: FastAPI):
     await redis_manager.connect()
     FastAPICache.init(RedisBackend(redis_manager.redis), prefix="fastapi_cache")
@@ -40,7 +52,7 @@ app.include_router(book_router)
 app.include_router(admin_router)
 app.mount(
     "/imgs",
-    StaticFiles(directory=Path(__file__).resolve().parent / "imgs"),
+    CachedImagesStaticFiles(directory=Path(__file__).resolve().parent / "imgs"),
     name="imgs"
 )
 app.mount(
