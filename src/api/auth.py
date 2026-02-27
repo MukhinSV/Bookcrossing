@@ -65,19 +65,16 @@ async def set_email_verification_code(db: DBDep, user_id: int, user_email: str) 
 
 
 @router.get("/register", response_class=HTMLResponse, summary="Страница регистрации")
-@cache(expire=10)
 async def register_page():
     return FileResponse(REGISTER_TEMPLATE_PATH)
 
 
 @router.get("/login", response_class=HTMLResponse, summary="Страница входа")
-@cache(expire=10)
 async def login_page():
     return FileResponse(LOGIN_TEMPLATE_PATH)
 
 
 @router.get("/verify-email/view", response_class=HTMLResponse, summary="Страница подтверждения email")
-@cache(expire=10)
 async def verify_email_page():
     return FileResponse(VERIFY_EMAIL_TEMPLATE_PATH)
 
