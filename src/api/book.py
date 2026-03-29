@@ -52,7 +52,7 @@ async def books_catalog_view_page():
 
 
 @router.get("/catalog", summary="Каталог книг с фильтрами и пагинацией")
-@cache(expire=10)
+@cache(expire=3)
 async def books_catalog(
     db: DBDep,
     request: Request,

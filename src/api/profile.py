@@ -10,7 +10,8 @@ from src.dependencies.db_dep import DBDep
 from src.dependencies.user_dep import PayloadDep
 from src.schemas.instance import InstancePatch
 from src.schemas.new_added_instance import NewAddedInstanceAdd
-from src.schemas.user import UserPatch
+from src.schemas.user import ChangePasswordRequest, UserPatch
+from src.services.user import AuthService
 
 router = APIRouter(prefix="/profile", tags=["Личный кабинет"])
 
@@ -20,6 +21,8 @@ PROFILE_RECORDS_TEMPLATE_PATH = Path(__file__).resolve().parents[
                                     1] / "templates" / "profile_records.html"
 PROFILE_ADD_BOOK_TEMPLATE_PATH = Path(__file__).resolve().parents[
                                      1] / "templates" / "profile_add_book.html"
+PROFILE_PASSWORD_TEMPLATE_PATH = Path(__file__).resolve().parents[
+                                     1] / "templates" / "profile_password.html"
 
 
 class ReturnBookRequest(BaseModel):
@@ -150,6 +153,12 @@ async def profile_add_book_view_page():
     return FileResponse(PROFILE_ADD_BOOK_TEMPLATE_PATH)
 
 
+@router.get("/password/view", response_class=HTMLResponse,
+            summary="HTML страница смены пароля")
+async def profile_password_view_page():
+    return FileResponse(PROFILE_PASSWORD_TEMPLATE_PATH)
+
+
 @router.get("/add-book", summary="Контекст страницы добавления книги")
 @cache(expire=10)
 async def profile_add_book_page(db: DBDep, payload: PayloadDep):
@@ -203,7 +212,7 @@ async def profile_records_page(section: str, db: DBDep, payload: PayloadDep, pag
     return response
 
 
-@router.patch("/{booking_id}")
+@router.patch("/booking/{booking_id}")
 async def booking_patch(booking_id: int, db: DBDep, payload: PayloadDep):
     booking = await db.booking.get_one_or_none(id=booking_id)
     new_instance = InstancePatch(status="OWNED", user_id=payload["user_id"])
@@ -213,7 +222,7 @@ async def booking_patch(booking_id: int, db: DBDep, payload: PayloadDep):
     return {"status": "ok"}
 
 
-@router.delete("/{booking_id}")
+@router.delete("/booking/{booking_id}")
 async def delete_booking(db: DBDep, booking_id: int):
     booking = await db.booking.get_one_or_none(id=booking_id)
     new_instance = InstancePatch(status="FREE")
@@ -244,5 +253,36 @@ async def return_book(instance_id: int, return_data: ReturnBookRequest, db: DBDe
 @router.patch("")
 async def edit(db: DBDep, payload: PayloadDep, user_data: UserPatch):
     await db.user.edit(user_data, exclude_unset=True, id=payload["user_id"])
+    await db.commit()
+    return {"status": "ok"}
+
+
+@router.patch("/password")
+async def change_password(db: DBDep, payload: PayloadDep, password_data: ChangePasswordRequest):
+    current_password = password_data.current_password.strip()
+    new_password = password_data.new_password.strip()
+    confirm_password = password_data.confirm_password.strip()
+
+    if not current_password:
+        raise HTTPException(status_code=400, detail="Введите текущий пароль")
+    if not new_password:
+        raise HTTPException(status_code=400, detail="Введите новый пароль")
+    if new_password != confirm_password:
+        raise HTTPException(status_code=400, detail="Подтверждение пароля не совпадает")
+
+    user = await db.user.get_user_with_hashed_password_by_id(payload["user_id"])
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    if not AuthService().verify_password(current_password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Текущий пароль введён неверно")
+    if AuthService().verify_password(new_password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Новый пароль должен отличаться от текущего")
+
+    new_hashed_password = AuthService().hash_password(new_password)
+    await db.session.execute(
+        db.user.model.__table__.update()
+        .where(db.user.model.id == payload["user_id"])
+        .values(hashed_password=new_hashed_password)
+    )
     await db.commit()
     return {"status": "ok"}

@@ -17,3 +17,11 @@ class UserRepository(BaseRepository):
         if model is None:
             return None
         return UserWithHashedPassword.model_validate(model)
+
+    async def get_user_with_hashed_password_by_id(self, user_id: int):
+        query = select(self.model).filter_by(id=user_id)
+        result = await self.session.execute(query)
+        model = result.scalars().one_or_none()
+        if model is None:
+            return None
+        return UserWithHashedPassword.model_validate(model)

@@ -7,16 +7,24 @@
   }
 
   function getInitialTheme() {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved === "light" || saved === "dark") {
-      return saved;
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved === "light" || saved === "dark") {
+        return saved;
+      }
+    } catch (error) {
+      return systemPrefersDark() ? "dark" : "light";
     }
     return systemPrefersDark() ? "dark" : "light";
   }
 
   function applyTheme(theme) {
     document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem(STORAGE_KEY, theme);
+    try {
+      localStorage.setItem(STORAGE_KEY, theme);
+    } catch (error) {
+      // Ignore storage errors and still apply the theme for the current page.
+    }
     const button = document.getElementById("theme-toggle");
     if (button) {
       button.setAttribute("aria-label", theme === "dark" ? "Включить светлую тему" : "Включить темную тему");
@@ -101,15 +109,23 @@
     });
   }
 
-  document.documentElement.setAttribute("data-theme", getInitialTheme());
+  function boot() {
+    document.documentElement.setAttribute("data-theme", getInitialTheme());
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", () => {
+        mountToggle();
+        mountMobileMenus();
+      });
+    } else {
       mountToggle();
       mountMobileMenus();
-    });
-  } else {
-    mountToggle();
-    mountMobileMenus();
+    }
+  }
+
+  try {
+    boot();
+  } catch (error) {
+    console.error("Bookcrossing UI init failed:", error);
   }
 })();

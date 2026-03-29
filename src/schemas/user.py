@@ -49,3 +49,9 @@ class UserPatch(BaseModel):
     name: str | None = None
     lastname: str | None = None
     email: EmailStr | None = None
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+    confirm_password: str

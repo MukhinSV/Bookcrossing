@@ -35,16 +35,62 @@
     const requestBody = document.getElementById("request-body");
     let resultTimer;
 
+    function showSideToast(type, message, timeoutMs = 4000) {
+      const existingStack = document.getElementById("page-toast-stack");
+      const stack = existingStack ?? (() => {
+        const element = document.createElement("div");
+        element.id = "page-toast-stack";
+        Object.assign(element.style, {
+          position: "fixed",
+          top: ".8rem",
+          right: window.innerWidth <= 699 ? ".8rem" : "1rem",
+          left: window.innerWidth <= 699 ? ".8rem" : "auto",
+          width: window.innerWidth <= 699 ? "auto" : "min(360px, calc(100vw - 2rem))",
+          zIndex: "1300",
+          display: "flex",
+          flexDirection: "column",
+          gap: ".75rem",
+          pointerEvents: "none",
+          transform: "none",
+        });
+        document.body.appendChild(element);
+        return element;
+      })();
+      const accentColor = {success:"var(--success)",danger:"var(--danger)",warning:"var(--warning)",info:"var(--primary)",secondary:"var(--border-strong)"}[type] || "var(--primary)";
+      const iconText = {success:"✓",danger:"!",warning:"•",info:"i",secondary:"•"}[type] || "i";
+      const titleText = {success:"Готово",danger:"Ошибка",warning:"Внимание",info:"Сообщение",secondary:"Сообщение"}[type] || "Сообщение";
+      const toast = document.createElement("div");
+      Object.assign(toast.style, {pointerEvents:"auto",border:"1px solid var(--border)",borderRadius:"16px",background:"color-mix(in srgb, var(--bg-elevated) 92%, transparent)",backdropFilter:"blur(16px)",boxShadow:"0 18px 34px rgba(15, 23, 42, 0.18)",overflow:"hidden",transform:"translateX(24px)",opacity:"0",transition:"transform .22s ease, opacity .22s ease"});
+      const body = document.createElement("div");
+      Object.assign(body.style, {display:"flex",alignItems:"flex-start",gap:".75rem",padding:".9rem .95rem 1rem",position:"relative"});
+      const accent = document.createElement("div");
+      Object.assign(accent.style, {position:"absolute",top:"0",left:"0",right:"0",height:"3px",background:accentColor});
+      const icon = document.createElement("div");
+      icon.textContent = iconText;
+      Object.assign(icon.style, {width:"2rem",height:"2rem",borderRadius:"999px",display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:"0",fontSize:".95rem",fontWeight:"800",color:"#fff",background:accentColor});
+      const content = document.createElement("div");
+      Object.assign(content.style, {minWidth:"0",flex:"1 1 auto"});
+      const title = document.createElement("div");
+      title.textContent = titleText;
+      Object.assign(title.style, {fontSize:".84rem",fontWeight:"700",marginBottom:".18rem",color:"var(--text)"});
+      const text = document.createElement("div");
+      text.textContent = String(message);
+      Object.assign(text.style, {fontSize:".92rem",lineHeight:"1.4",color:"var(--text)",overflowWrap:"anywhere"});
+      const close = document.createElement("button");
+      close.type = "button";
+      close.textContent = "×";
+      Object.assign(close.style, {border:"0",background:"transparent",color:"var(--text-muted)",padding:"0",width:"1.5rem",height:"1.5rem",borderRadius:"999px",cursor:"pointer",flexShrink:"0",fontSize:"1rem",lineHeight:"1"});
+      function removeToast() { if (!toast.isConnected) return; toast.style.transform = "translateX(24px)"; toast.style.opacity = "0"; setTimeout(() => toast.remove(), 220); }
+      close.addEventListener("click", removeToast);
+      content.appendChild(title); content.appendChild(text);
+      body.appendChild(accent); body.appendChild(icon); body.appendChild(content); body.appendChild(close);
+      toast.appendChild(body); stack.appendChild(toast);
+      requestAnimationFrame(() => { toast.style.transform = "translateX(0)"; toast.style.opacity = "1"; });
+      if (timeoutMs > 0) setTimeout(removeToast, timeoutMs);
+    }
+
     function showResult(type, message, timeoutMs = 4000) {
-      clearTimeout(resultTimer);
-      result.className = `mb-3 alert alert-${type}`;
-      result.textContent = message;
-      if (timeoutMs > 0) {
-        resultTimer = setTimeout(() => {
-          result.className = "mb-3";
-          result.textContent = "";
-        }, timeoutMs);
-      }
+      showSideToast(type, message, timeoutMs);
     }
 
     function getRequestIdFromPath() {

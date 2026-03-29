@@ -251,7 +251,7 @@ async def admin_meta(db: DBDep, request: Request):
 
 
 @router.get("/requests", summary="Заявки new_added_instance")
-@cache(expire=20)
+@cache(expire=10)
 async def admin_requests(db: DBDep, request: Request, page: int = 1, per_page: int = 10, q: str | None = None):
     get_admin_payload_or_404(request)
     rows = await db.new_added_instance.get_all()
@@ -273,7 +273,7 @@ async def admin_requests(db: DBDep, request: Request, page: int = 1, per_page: i
 
 
 @router.get("/requests/{request_id}", summary="Заявка по id")
-@cache(expire=20)
+@cache(expire=10)
 async def admin_request_by_id(request_id: int, db: DBDep, request: Request):
     get_admin_payload_or_404(request)
     row = await db.new_added_instance.get_one_or_none(id=request_id)
@@ -385,7 +385,6 @@ async def admin_approve_request(
 
 
 @router.get("/table/{table_name}", summary="Данные таблицы")
-@cache(expire=20)
 async def admin_table_get(
     table_name: str,
     db: DBDep,
