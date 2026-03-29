@@ -297,26 +297,21 @@
       }
 
       actionsArea.innerHTML = `
-        <div class="d-flex flex-wrap gap-2">
-          <button id="open-booking-form-btn" type="button" class="btn btn-primary">
-            Забронировать
-          </button>
-          <button id="pickup-book-btn" type="button" class="btn btn-success">
-            Уже забрал
-          </button>
-        </div>
-        <div id="booking-form" class="d-none">
+        <div>
           <label for="exchange-select" class="form-label">Выберите адрес получения</label>
           <select id="exchange-select" class="form-select mb-3"></select>
-          <button id="confirm-booking-btn" type="button" class="btn btn-success">
-            Подтвердить бронь
-          </button>
+          <div class="d-flex flex-wrap gap-2">
+            <button id="confirm-booking-btn" type="button" class="btn btn-primary">
+              Забронировать
+            </button>
+            <button id="pickup-book-btn" type="button" class="btn btn-success">
+              Уже забрал
+            </button>
+          </div>
         </div>
       `;
 
-      const openBookingBtn = document.getElementById("open-booking-form-btn");
       const pickupBookBtn = document.getElementById("pickup-book-btn");
-      const bookingForm = document.getElementById("booking-form");
       const exchangeSelect = document.getElementById("exchange-select");
       const confirmBookingBtn = document.getElementById("confirm-booking-btn");
 
@@ -331,12 +326,6 @@
         option.value = String(point.id);
         option.textContent = point.address ?? "Адрес не указан";
         exchangeSelect.appendChild(option);
-      });
-
-      openBookingBtn.addEventListener("click", () => {
-        const isHidden = bookingForm.classList.contains("d-none");
-        bookingForm.classList.toggle("d-none", !isHidden);
-        openBookingBtn.textContent = isHidden ? "Скрыть выбор адреса" : "Забронировать";
       });
 
       pickupBookBtn.addEventListener("click", () => {

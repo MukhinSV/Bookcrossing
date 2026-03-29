@@ -90,7 +90,15 @@
     .book-card {
       min-height: 220px;
       max-width: 70%;
+      width: 100%;
       margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+    }
+    .book-card .card-body {
+      display: flex;
+      flex: 1 1 auto;
+      flex-direction: column;
     }
     .book-cover-frame {
       margin: 0.75rem auto 0;
@@ -425,7 +433,7 @@
                 </div>
                 <p class="mb-1"><strong>Автор:</strong> ${book.author?.fullname ?? "-"}</p>
                 <p class="mb-1"><strong>Жанр:</strong> ${book.genre ?? "-"}</p>
-                <a href="/book/${book.id}/view" class="btn btn-outline-primary btn-sm mt-2 d-block mx-auto w-50 text-center">
+                <a href="/book/${book.id}/view" class="btn btn-outline-primary btn-sm mt-auto d-block mx-auto w-50 text-center">
                   Перейти
                 </a>
               </div>

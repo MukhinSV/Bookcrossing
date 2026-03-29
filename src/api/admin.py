@@ -1,4 +1,5 @@
 import uuid
+import json
 from datetime import datetime, timezone, date
 from pathlib import Path
 
@@ -69,6 +70,17 @@ def model_to_dict(model):
         column.name: to_json_value(getattr(model, column.name))
         for column in model.__table__.columns
     }
+
+
+async def save_uploaded_image(image_file: UploadFile | None) -> str | None:
+    if not image_file or not image_file.filename:
+        return None
+    suffix = Path(image_file.filename).suffix.lower() or ".jpg"
+    image_name = f"{uuid.uuid4().hex}{suffix}"
+    IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+    file_path = IMAGES_DIR / image_name
+    file_path.write_bytes(await image_file.read())
+    return image_name
 
 
 def cast_value(column, value):
@@ -420,17 +432,37 @@ async def admin_table_get(
 
 
 @router.post("/table/{table_name}", summary="Добавить запись")
-async def admin_table_create(table_name: str, db: DBDep, request: Request, data: dict):
+async def admin_table_create(table_name: str, db: DBDep, request: Request):
     get_admin_payload_or_404(request)
     model = MODEL_MAP.get(table_name)
     if not model:
         raise HTTPException(status_code=404, detail="Таблица не найдена")
-    payload_data = dict(data)
+
+    content_type = request.headers.get("content-type", "").lower()
+    payload_data = {}
+    image_file = None
+
+    if "multipart/form-data" in content_type or "application/x-www-form-urlencoded" in content_type:
+        form = await request.form()
+        for key, value in form.multi_items():
+            if hasattr(value, "filename"):
+                if key in {"image", "image_file"}:
+                    image_file = value
+                continue
+            payload_data[key] = value
+    else:
+        body = await request.body()
+        payload_data = json.loads(body.decode("utf-8")) if body else {}
+
     if table_name == "user":
         raw_password = str(payload_data.get("password") or "").strip()
         if raw_password:
             payload_data["hashed_password"] = AuthService().hash_password(raw_password)
         payload_data.pop("password", None)
+    if table_name == "book":
+        image_name = await save_uploaded_image(image_file)
+        if image_name:
+            payload_data["image"] = image_name
     values = normalize_payload(model, payload_data)
     if not values:
         raise HTTPException(status_code=400, detail="Нет данных для добавления")
@@ -478,11 +510,9 @@ async def admin_book_upload_image(row_id: int, db: DBDep, request: Request, imag
     if not image_file.filename:
         raise HTTPException(status_code=400, detail="Файл не выбран")
 
-    suffix = Path(image_file.filename).suffix.lower() or ".jpg"
-    image_name = f"{uuid.uuid4().hex}{suffix}"
-    IMAGES_DIR.mkdir(parents=True, exist_ok=True)
-    file_path = IMAGES_DIR / image_name
-    file_path.write_bytes(await image_file.read())
+    image_name = await save_uploaded_image(image_file)
+    if not image_name:
+        raise HTTPException(status_code=400, detail="Файл не выбран")
 
     await db.session.execute(update(BookORM).where(BookORM.id == row_id).values(image=image_name))
     await db.commit()

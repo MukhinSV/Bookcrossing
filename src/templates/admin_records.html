@@ -359,6 +359,22 @@
           `;
         }
 
+        if (currentTable === "book" && column.name === "image") {
+          return `
+            <div class="col-12 col-md-6">
+              <label class="form-label" for="create-${column.name}">${column.name}</label>
+              <input
+                id="create-${column.name}"
+                data-name="${column.name}"
+                data-type="${column.type}"
+                type="file"
+                class="form-control form-control-sm"
+                accept="image/*"
+              >
+            </div>
+          `;
+        }
+
         if (inputType === "checkbox") {
           return `
             <div class="col-12 col-md-6">
@@ -556,34 +572,54 @@
       event.preventDefault();
       if (!currentTable) return;
       const payload = {};
+      const formData = new FormData();
+      let hasFilePayload = false;
+
       createForm.querySelectorAll("[data-name]").forEach((input) => {
         const fieldName = input.dataset.name;
         const fieldType = String(input.dataset.type || "").toLowerCase();
-        if (input.type === "checkbox") {
-          payload[fieldName] = Boolean(input.checked);
+
+        if (input.type === "file") {
+          if (input.files && input.files[0]) {
+            formData.set(fieldName, input.files[0]);
+            hasFilePayload = true;
+          }
           return;
         }
+
+        if (input.type === "checkbox") {
+          payload[fieldName] = Boolean(input.checked);
+          formData.set(fieldName, String(Boolean(input.checked)));
+          return;
+        }
+
         const rawValue = input.value;
         if (rawValue === "") {
           return;
         }
         if (fieldType.includes("datetime")) {
           payload[fieldName] = new Date(rawValue).toISOString();
+          formData.set(fieldName, payload[fieldName]);
           return;
         }
         payload[fieldName] = rawValue;
+        formData.set(fieldName, rawValue);
       });
 
-      if (Object.keys(payload).length === 0) {
+      if (Object.keys(payload).length === 0 && !hasFilePayload) {
         showResult("danger", "Заполните хотя бы одно поле");
         return;
       }
 
-      const response = await fetch(`/admin/table/${currentTable}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
+      const requestOptions = hasFilePayload || currentTable === "book"
+        ? { method: "POST", body: formData }
+        : {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          };
+
+      const response = await fetch(`/admin/table/${currentTable}`, requestOptions);
       const data = await response.json();
       if (!response.ok) {
         showResult("danger", data.detail ? String(data.detail) : "Не удалось создать запись");
