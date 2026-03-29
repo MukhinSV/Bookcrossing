@@ -64,6 +64,9 @@
       transform: translateY(-4px);
       box-shadow: 0 16px 24px rgba(7, 14, 12, 0.15);
     }
+    .news-card {
+      width: 100%;
+    }
     .news-section .row > [class*="col-"] {
       margin-bottom: .55rem;
     }
@@ -86,7 +89,7 @@
     }
     .book-card {
       min-height: 220px;
-      max-width: 220px;
+      max-width: 70%;
       margin: 0 auto;
     }
     .book-cover-frame {
@@ -120,6 +123,16 @@
       text-shadow: 0 1px 1px rgba(0, 0, 0, .25);
       flex-shrink: 0;
     }
+    .book-status-badge svg {
+      width: .92rem;
+      height: .92rem;
+      display: block;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
     .book-status-badge.booked {
       color: #fff;
       background: #2563eb;
@@ -136,7 +149,7 @@
     }
     #books-grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: .9rem;
     }
     .news-badge {
@@ -162,12 +175,26 @@
       margin-bottom: .42rem;
     }
     .site-footer .muted { color: var(--text-muted); }
+    @media (min-width: 1000px) {
+      #books-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+    @media (min-width: 700px) {
+      .news-section .row > [class*="col-"] {
+        display: flex;
+      }
+      .news-section .news-card {
+        width: 100%;
+        min-height: 100%;
+      }
+    }
     @media (max-width: 699.98px) {
       #books-grid {
         grid-template-columns: 1fr;
       }
       .book-card {
-        max-width: 100%;
+        max-width: 70%;
         min-height: 0;
       }
       .book-cover-frame {
@@ -364,10 +391,10 @@
 
     function getBookStatusBadge(book) {
       if (book?.is_booked_by_user) {
-        return '<span class="book-status-badge booked" title="Книга забронирована вами" aria-label="Книга забронирована вами">🔖</span>';
+        return '<span class="book-status-badge booked" title="Книга забронирована вами" aria-label="Книга забронирована вами"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.75h10a1.25 1.25 0 0 1 1.25 1.25v13.25l-6.25-3.5-6.25 3.5V6A1.25 1.25 0 0 1 7 4.75Z"/></svg></span>';
       }
       if (book?.is_owned_by_user) {
-        return '<span class="book-status-badge owned" title="Книга у вас" aria-label="Книга у вас">✓</span>';
+        return '<span class="book-status-badge owned" title="Книга у вас" aria-label="Книга у вас"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6.75 12.5 3.5 3.5 7-7.5"/></svg></span>';
       }
       return "";
     }

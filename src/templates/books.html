@@ -42,6 +42,9 @@
     #books-grid {
       row-gap: .9rem;
     }
+    #books-grid > * {
+      width: 50%;
+    }
     .book-status-badge {
       position: absolute;
       top: .45rem;
@@ -59,6 +62,16 @@
       box-shadow: 0 6px 14px rgba(0, 0, 0, .22);
       text-shadow: 0 1px 1px rgba(0, 0, 0, .25);
     }
+    .book-status-badge svg {
+      width: 1rem;
+      height: 1rem;
+      display: block;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
     .book-status-badge.booked {
       color: #fff;
       background: #2563eb;
@@ -66,6 +79,69 @@
     .book-status-badge.owned {
       color: #fff;
       background: #16a34a;
+    }
+    @media (max-width: 575.98px) {
+      #books-grid {
+        --gutter: .65rem;
+        row-gap: .7rem;
+      }
+      .book-card {
+        max-width: 162px;
+        border-radius: .65rem;
+      }
+      .book-cover-frame {
+        aspect-ratio: auto;
+        border-radius: .6rem;
+        padding: 0;
+        background: #fff;
+        height: auto;
+      }
+      .book-cover {
+        display: block;
+        width: 100%;
+        height: auto;
+        object-fit: contain;
+      }
+      .book-card .card-body {
+        padding: .5rem .5rem .56rem;
+      }
+      .book-card .h6 {
+        font-size: .78rem;
+        line-height: 1.2;
+        margin-bottom: .28rem !important;
+      }
+      .book-card .text-muted {
+        font-size: .7rem;
+        margin-bottom: .45rem !important;
+      }
+      .book-status-badge {
+        width: 1.45rem;
+        height: 1.45rem;
+        top: .3rem;
+        right: .3rem;
+        font-size: .82rem;
+      }
+      .book-card .btn {
+        width: 100%;
+        padding: .36rem .45rem;
+        font-size: .76rem;
+        min-height: 0;
+      }
+    }
+    @media (min-width: 768px) {
+      #books-grid > * {
+        width: 33.3333%;
+      }
+    }
+    @media (min-width: 992px) {
+      #books-grid > * {
+        width: 25%;
+      }
+    }
+    @media (min-width: 1400px) {
+      #books-grid > * {
+        width: 16.6667%;
+      }
     }
   </style>
 </head>
@@ -140,10 +216,12 @@
     <div id="books-grid" class="row g-3"></div>
     <div id="books-empty" class="alert alert-secondary d-none">Книги не найдены</div>
 
-    <nav aria-label="Пагинация" class="mt-auto pt-1">
-      <ul id="pagination" class="pagination justify-content-center mb-0"></ul>
-      <div id="pagination-status" class="small text-muted text-center mt-2"></div>
-    </nav>
+    <div class="mt-4">
+      <nav aria-label="Пагинация" class="mt-auto pt-1">
+        <ul id="pagination" class="pagination justify-content-center mb-0"></ul>
+        <div id="pagination-status" class="small text-muted text-center mt-2"></div>
+      </nav>
+    </div>
   </main>
 
   <footer class="site-footer">
@@ -178,7 +256,9 @@
     let yearTouched = false;
     let yearMin = null;
     let yearMax = null;
+    let currentPerPage = 6;
     let initialAddressFilter = new URLSearchParams(window.location.search).get("address");
+    let resizeTimer;
 
     function showResult(type, message, timeoutMs = 3500) {
       clearTimeout(resultTimer);
@@ -205,7 +285,7 @@
     function getCurrentQueryParams(page) {
       const params = new URLSearchParams();
       params.set("page", String(page));
-      params.set("per_page", "6");
+      params.set("per_page", String(getCatalogPerPage()));
 
       const q = qInput.value.trim();
       const genre = genreSelect.value;
@@ -222,6 +302,22 @@
       if (address) params.set("address", address);
 
       return params;
+    }
+
+    function getCatalogPerPage() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      if (width < 768) {
+        return 6;
+      }
+      if (width < 992) {
+        return 9;
+      }
+      if (width < 1400) {
+        return height < 900 ? 8 : 12;
+      }
+      return height < 960 ? 12 : 18;
     }
 
     function fillSelectOptions(selectElement, items, valueKey, labelKey) {
@@ -249,7 +345,7 @@
         const imageSrc = resolveBookImage(book.image);
         const statusBadge = getBookStatusBadge(book);
         return `
-          <div class="col-12 col-sm-6 col-md-4 col-lg-3 col-xxl-2">
+          <div class="col-sm-6 col-md-4 col-lg-3 col-xxl-2">
             <div class="card h-100 shadow-sm book-card">
               <div class="book-cover-frame">
                 ${statusBadge}
@@ -273,10 +369,10 @@
 
     function getBookStatusBadge(book) {
       if (book?.is_booked_by_user) {
-        return '<span class="book-status-badge booked" title="Книга забронирована вами" aria-label="Книга забронирована вами">🔖</span>';
+        return '<span class="book-status-badge booked" title="Книга забронирована вами" aria-label="Книга забронирована вами"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.75h10a1.25 1.25 0 0 1 1.25 1.25v13.25l-6.25-3.5-6.25 3.5V6A1.25 1.25 0 0 1 7 4.75Z"/></svg></span>';
       }
       if (book?.is_owned_by_user) {
-        return '<span class="book-status-badge owned" title="Книга у вас" aria-label="Книга у вас">✓</span>';
+        return '<span class="book-status-badge owned" title="Книга у вас" aria-label="Книга у вас"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6.75 12.5 3.5 3.5 7-7.5"/></svg></span>';
       }
       return "";
     }
@@ -388,6 +484,7 @@
         }
 
         currentPage = data.page ?? 1;
+        currentPerPage = data.per_page ?? getCatalogPerPage();
         totalPages = data.total_pages ?? 0;
 
         renderFilterControls(data.filters);
@@ -432,6 +529,16 @@
       }
       yearValue.textContent = "Все";
       loadBooks(1);
+    });
+
+    window.addEventListener("resize", () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        const nextPerPage = getCatalogPerPage();
+        if (nextPerPage !== currentPerPage) {
+          loadBooks(1);
+        }
+      }, 150);
     });
 
     loadBooks(1);

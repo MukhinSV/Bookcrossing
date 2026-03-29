@@ -46,6 +46,16 @@
       box-shadow: 0 6px 14px rgba(0, 0, 0, .22);
       text-shadow: 0 1px 1px rgba(0, 0, 0, .25);
     }
+    .book-status-badge svg {
+      width: 1.1rem;
+      height: 1.1rem;
+      display: block;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
     .book-status-badge.booked {
       background: #2563eb;
     }
@@ -151,10 +161,10 @@
 
     function getBookStatusBadge(book) {
       if (book?.is_booked_by_user) {
-        return '<span class="book-status-badge booked" title="Книга забронирована вами" aria-label="Книга забронирована вами">🔖</span>';
+        return '<span class="book-status-badge booked" title="Книга забронирована вами" aria-label="Книга забронирована вами"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.75h10a1.25 1.25 0 0 1 1.25 1.25v13.25l-6.25-3.5-6.25 3.5V6A1.25 1.25 0 0 1 7 4.75Z"/></svg></span>';
       }
       if (book?.is_owned_by_user) {
-        return '<span class="book-status-badge owned" title="Книга у вас" aria-label="Книга у вас">✓</span>';
+        return '<span class="book-status-badge owned" title="Книга у вас" aria-label="Книга у вас"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6.75 12.5 3.5 3.5 7-7.5"/></svg></span>';
       }
       return "";
     }
@@ -188,10 +198,39 @@
       }
     }
 
+    async function handlePickup(bookId, instanceId) {
+      try {
+        const response = await fetch(`/book/${bookId}/pickup/${instanceId}`, {
+          method: "POST"
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          showResult("danger", data.detail ? String(data.detail) : "Не удалось забрать книгу");
+          return;
+        }
+        showResult("success", "Книга добавлена во взятые");
+        setTimeout(() => {
+          window.location.href = "/profile/view";
+        }, 700);
+      } catch (error) {
+        showResult("danger", "Ошибка запроса");
+      }
+    }
+
     function renderActions(bookId, context) {
       const instances = context.instances;
       const booking = context.booking;
       const exchangePoints = context.exchanges_point;
+      const book = context.book;
+
+      if (book?.is_owned_by_user) {
+        actionsArea.innerHTML = `
+          <div class="alert alert-success mb-0">
+            Эта книга уже находится у вас. Она доступна в разделе "Взятые книги" в личном кабинете.
+          </div>
+        `;
+        return;
+      }
 
       if (booking) {
         actionsArea.innerHTML = `
@@ -212,9 +251,14 @@
       }
 
       actionsArea.innerHTML = `
-        <button id="open-booking-form-btn" type="button" class="btn btn-primary">
-          Забронировать
-        </button>
+        <div class="d-flex flex-wrap gap-2">
+          <button id="open-booking-form-btn" type="button" class="btn btn-primary">
+            Забронировать
+          </button>
+          <button id="pickup-book-btn" type="button" class="btn btn-success">
+            Уже забрал
+          </button>
+        </div>
         <div id="booking-form" class="d-none">
           <label for="exchange-select" class="form-label">Выберите адрес получения</label>
           <select id="exchange-select" class="form-select mb-3"></select>
@@ -225,6 +269,7 @@
       `;
 
       const openBookingBtn = document.getElementById("open-booking-form-btn");
+      const pickupBookBtn = document.getElementById("pickup-book-btn");
       const bookingForm = document.getElementById("booking-form");
       const exchangeSelect = document.getElementById("exchange-select");
       const confirmBookingBtn = document.getElementById("confirm-booking-btn");
@@ -245,8 +290,21 @@
       openBookingBtn.addEventListener("click", () => {
         const isHidden = bookingForm.classList.contains("d-none");
         bookingForm.classList.toggle("d-none", !isHidden);
-        openBookingBtn.classList.toggle("mb-3", isHidden);
         openBookingBtn.textContent = isHidden ? "Скрыть выбор адреса" : "Забронировать";
+      });
+
+      pickupBookBtn.addEventListener("click", () => {
+        const selectedExchangePointId = Number(exchangeSelect.value);
+        const selectedInstance = instances.find((instance) => (
+          instance.exchange_point_id === selectedExchangePointId
+        )) ?? instances[0];
+
+        if (!selectedInstance) {
+          showResult("danger", "Свободных экземпляров не найдено");
+          return;
+        }
+
+        handlePickup(bookId, selectedInstance.id);
       });
 
       confirmBookingBtn.addEventListener("click", () => {

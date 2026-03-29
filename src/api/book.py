@@ -52,11 +52,12 @@ async def books_catalog_view_page():
 
 
 @router.get("/catalog", summary="Каталог книг с фильтрами и пагинацией")
-@cache(expire=20)
+@cache(expire=10)
 async def books_catalog(
     db: DBDep,
     request: Request,
     page: int = 1,
+    per_page: int = 6,
     q: str | None = None,
     genre: str | None = None,
     author_id: int | None = None,
@@ -65,7 +66,7 @@ async def books_catalog(
     address: str | None = None,
 ):
     page = max(page, 1)
-    per_page = 6
+    per_page = min(max(per_page, 1), 24)
     q = q.strip() if q else None
     if q == "":
         q = None
@@ -111,7 +112,7 @@ async def book_view_page(book_id: int):
 
 
 @router.get("/{book_id}", summary="Получить книгу")
-@cache(expire=20)
+@cache(expire=5)
 async def get_book(book_id: int, db: DBDep, request: Request):
     user = None
     payload = None
@@ -163,9 +164,46 @@ async def get_book(book_id: int, db: DBDep, request: Request):
 @router.post("/{book_id}/booking/{instance_id}", summary="Забронировать книгу")
 async def create_booking(book_id: int, instance_id: int, db: DBDep,
                          payload: PayloadDep):
+    instance_data = await db.instance.get_one_or_none(id=instance_id, book_id=book_id)
+    if not instance_data:
+        raise HTTPException(status_code=404, detail="Экземпляр книги не найден")
+    if instance_data.status != "FREE":
+        raise HTTPException(status_code=400, detail="Книга уже недоступна")
+
+    existing_booking = await db.booking.get_one_or_none(
+        user_id=payload["user_id"],
+        book_id=book_id,
+    )
+    if existing_booking:
+        raise HTTPException(status_code=400, detail="Эта книга уже забронирована вами")
+
     booking = BookingAdd(user_id=payload["user_id"], instance_id=instance_id, book_id=book_id)
     await db.booking.add(booking)
     instance = InstancePatch(status="BOOKED")
     await db.instance.edit(instance, exclude_unset=True, id=instance_id)
+    await db.commit()
+    return {"status": "ok"}
+
+
+@router.post("/{book_id}/pickup/{instance_id}", summary="Забрать книгу без брони")
+async def pickup_book(book_id: int, instance_id: int, db: DBDep, payload: PayloadDep):
+    instance_data = await db.instance.get_one_or_none(id=instance_id, book_id=book_id)
+    if not instance_data:
+        raise HTTPException(status_code=404, detail="Экземпляр книги не найден")
+    if instance_data.status != "FREE":
+        raise HTTPException(status_code=400, detail="Книга уже недоступна")
+
+    existing_booking = await db.booking.get_one_or_none(
+        user_id=payload["user_id"],
+        book_id=book_id,
+    )
+    if existing_booking:
+        raise HTTPException(
+            status_code=400,
+            detail="У вас уже есть бронирование этой книги. Отметьте получение в личном кабинете.",
+        )
+
+    new_instance = InstancePatch(status="OWNED", user_id=payload["user_id"])
+    await db.instance.edit(new_instance, exclude_unset=True, id=instance_id)
     await db.commit()
     return {"status": "ok"}
