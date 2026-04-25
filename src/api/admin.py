@@ -1,4 +1,3 @@
-import uuid
 import json
 from datetime import datetime, timezone, date
 from pathlib import Path
@@ -20,6 +19,7 @@ from src.models.user import UserORM
 from src.schemas.author import AuthorAdd
 from src.schemas.book import BookAdd
 from src.schemas.instance import InstanceAdd
+from src.services.cloudinary_storage import upload_book_image
 from src.services.user import AuthService
 
 router = APIRouter(prefix="/admin", tags=["Админ"])
@@ -28,8 +28,6 @@ ADMIN_REQUEST_TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "templates" 
 ADMIN_REQUESTS_TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "templates" / "admin_requests.html"
 ADMIN_RECORDS_TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "templates" / "admin_records.html"
 ADMIN_STATS_TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "templates" / "admin_stats.html"
-IMAGES_DIR = Path(__file__).resolve().parents[1] / "imgs"
-
 MODEL_MAP = {
     "user": UserORM,
     "author": AuthorORM,
@@ -73,14 +71,7 @@ def model_to_dict(model):
 
 
 async def save_uploaded_image(image_file: UploadFile | None) -> str | None:
-    if not image_file or not image_file.filename:
-        return None
-    suffix = Path(image_file.filename).suffix.lower() or ".jpg"
-    image_name = f"{uuid.uuid4().hex}{suffix}"
-    IMAGES_DIR.mkdir(parents=True, exist_ok=True)
-    file_path = IMAGES_DIR / image_name
-    file_path.write_bytes(await image_file.read())
-    return image_name
+    return await upload_book_image(image_file)
 
 
 def cast_value(column, value):
@@ -224,7 +215,7 @@ async def admin_stats_data(db: DBDep, request: Request):
 
 
 @router.get("/meta", summary="Метаданные админки")
-@cache(expire=20)
+# @cache(expire=20)
 async def admin_meta(db: DBDep, request: Request):
     get_admin_payload_or_404(request)
     exchanges = await db.exchange_point.get_all()
@@ -263,7 +254,7 @@ async def admin_meta(db: DBDep, request: Request):
 
 
 @router.get("/requests", summary="Заявки new_added_instance")
-@cache(expire=10)
+# @cache(expire=10)
 async def admin_requests(db: DBDep, request: Request, page: int = 1, per_page: int = 10, q: str | None = None):
     get_admin_payload_or_404(request)
     rows = await db.new_added_instance.get_all()
@@ -285,7 +276,7 @@ async def admin_requests(db: DBDep, request: Request, page: int = 1, per_page: i
 
 
 @router.get("/requests/{request_id}", summary="Заявка по id")
-@cache(expire=10)
+# @cache(expire=10)
 async def admin_request_by_id(request_id: int, db: DBDep, request: Request):
     get_admin_payload_or_404(request)
     row = await db.new_added_instance.get_one_or_none(id=request_id)
@@ -342,14 +333,7 @@ async def admin_approve_request(
             AuthorAdd(fullname=effective_author, country=author_country.strip() if author_country else None)
         )
 
-    image_name = None
-    if image_file and image_file.filename:
-        suffix = Path(image_file.filename).suffix.lower() or ".jpg"
-        image_name = f"{uuid.uuid4().hex}{suffix}"
-        IMAGES_DIR.mkdir(parents=True, exist_ok=True)
-        file_path = IMAGES_DIR / image_name
-        content = await image_file.read()
-        file_path.write_bytes(content)
+    image_name = await save_uploaded_image(image_file)
 
     book = await db.book.get_one_or_none(title=effective_title)
     if not book:

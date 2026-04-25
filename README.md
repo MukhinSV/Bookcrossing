@@ -5,7 +5,7 @@
 - HTML-шаблоны: `src/templates`
 - API и backend-логика: `src/api`
 - Миграции: Alembic (`src/migrations`)
-- Изображения книг: `src/imgs`
+- Изображения книг: Cloudinary (`CLOUDINARY_URL`)
 
 ## Возможности
 
@@ -34,7 +34,7 @@ src/
   services/        # бизнес-логика
   templates/       # HTML-шаблоны
   static/          # общие стили и JS
-  imgs/            # загружаемые изображения
+  imgs/            # старые локальные изображения / fallback
   migrations/      # Alembic-миграции
 ```
 
@@ -70,6 +70,9 @@ SMTP_PASS=change_me
 SMTP_FROM=mailer@example.com
 SMTP_STARTTLS=true
 SMTP_SSL=false
+
+CLOUDINARY_URL=cloudinary://your_api_key:your_api_secret@your_cloud_name
+CLOUDINARY_UPLOAD_FOLDER=bookcrossing/books
 ```
 
 ### 3) Применить миграции
@@ -133,8 +136,9 @@ docker compose down -v
 
 ## Загрузка изображений и статика
 
-- Загружаемые картинки сохраняются в `src/imgs`.
-- В Docker папка `src/imgs` примонтирована в контейнер (`./src/imgs:/app/src/imgs`), поэтому файлы сохраняются на хосте.
+- Новые загружаемые картинки отправляются в Cloudinary.
+- В базе данных в поле `book.image` сохраняется полный `https://...` URL.
+- Папка `src/imgs` оставлена для старых локальных изображений и fallback-статики.
 - Статика приложения отдаётся через `/static`.
 
 ## Полезные команды

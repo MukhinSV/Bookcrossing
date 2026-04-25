@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+DEFAULT_IMAGES_DIR = BASE_DIR / "src" / "imgs"
 
 
 class Settings(BaseSettings):
@@ -25,5 +26,9 @@ class Settings(BaseSettings):
     SMTP_FROM: str | None = None
     SMTP_STARTTLS: bool = True
     SMTP_SSL: bool = False
+
+    IMAGES_DIR: Path = DEFAULT_IMAGES_DIR
+    CLOUDINARY_URL: str | None = None
+    CLOUDINARY_UPLOAD_FOLDER: str = "bookcrossing/books"
 
 settings = Settings()

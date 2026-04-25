@@ -22,6 +22,7 @@ from src.api.profile import router as profile_router
 from src.api.view import router as view_router
 from src.api.book import router as book_router
 from src.api.admin import router as admin_router
+from src.config import settings
 from src.init import redis_manager
 
 
@@ -45,6 +46,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+settings.IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 app.include_router(auth_router)
 app.include_router(profile_router)
 app.include_router(view_router)
@@ -52,7 +54,7 @@ app.include_router(book_router)
 app.include_router(admin_router)
 app.mount(
     "/imgs",
-    CachedImagesStaticFiles(directory=Path(__file__).resolve().parent / "imgs"),
+    CachedImagesStaticFiles(directory=settings.IMAGES_DIR),
     name="imgs"
 )
 app.mount(

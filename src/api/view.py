@@ -83,7 +83,7 @@ async def main_page(db: DBDep, request: Request):
 
 
 @router.get("/shelves", summary="Все адреса полок")
-@cache(expire=10)
+# @cache(expire=10)
 async def shelves_page(db: DBDep, q: str | None = None, page: int = 1):
     page = max(page, 1)
     per_page = 10

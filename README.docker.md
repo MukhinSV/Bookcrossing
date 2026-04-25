@@ -26,8 +26,8 @@ App will be available at:
   - `db` (PostgreSQL)
   - `backend` (FastAPI serving both backend and HTML/templates/static)
 - DB migrations are applied automatically on backend start (`alembic upgrade head`).
-- Uploaded images are persisted on host via bind mount:
-  - `./src/imgs` -> `/app/src/imgs`
+- New uploaded images are sent to Cloudinary via `CLOUDINARY_URL`.
+- The local bind mount `./src/imgs -> /app/src/imgs` is kept only for old local images and fallback static files.
 
 ## Stop
 
