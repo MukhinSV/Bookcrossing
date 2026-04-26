@@ -8,42 +8,12 @@ from fastapi_cache.decorator import cache
 from src.dependencies.db_dep import DBDep
 from src.models.exchange_point import ExchangePointORM
 from src.models.organisation import OrganisationORM
+from src.services.book_payloads import enrich_books_with_user_flags
 from src.services.user import AuthService
 
 router = APIRouter(prefix="/main", tags=["Главная страница"])
 INDEX_TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "templates" / "index.html"
 SHELVES_TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "templates" / "shelves.html"
-
-
-async def enrich_books_with_user_flags(db: DBDep, books: list, user_id: int | None):
-    books_payload = [book.model_dump() for book in books]
-    if not books_payload:
-        return books_payload
-
-    booked_ids = set()
-    owned_ids = set()
-    available_book_ids = {book["id"] for book in books_payload}
-
-    if user_id:
-        bookings = await db.booking.get_all(user_id=user_id)
-        booked_ids = {
-            booking.book_id
-            for booking in bookings
-            if booking.book_id in available_book_ids
-        }
-        instances = await db.instance.get_all(user_id=user_id)
-        owned_ids = {
-            instance.book_id
-            for instance in instances
-            if instance.status == "OWNED" and instance.book_id in available_book_ids
-        }
-
-    for book in books_payload:
-        book_id = book["id"]
-        book["is_booked_by_user"] = book_id in booked_ids
-        book["is_owned_by_user"] = book_id in owned_ids
-    return books_payload
-
 
 @router.get("/view", summary="HTML главная страница", response_class=HTMLResponse)
 async def main_view_page():
@@ -65,20 +35,11 @@ async def main_page(db: DBDep, request: Request):
             user = await db.user.get_one_or_none(id=payload["user_id"])
         except Exception:
             user = None
-    books = await db.book.get_all()
+    books = await db.book.get_main_page_books(limit=9)
     user_id = user.id if user else None
     books_payload = await enrich_books_with_user_flags(db, books, user_id)
-    exchange_points = await db.exchange_point.get_all()
-    organisations = [
-        {
-            "id": point.id,
-            "name": point.organisation.name if point.organisation else "-",
-            "address": point.address,
-            "description": point.description,
-        }
-        for point in exchange_points
-    ]
-    context = {"user": user, "books": books_payload[:9], "organisations": organisations[:3]}
+    organisations = await db.exchange_point.get_main_page_cards(limit=3)
+    context = {"user": user, "books": books_payload, "organisations": organisations}
     return context
 
 

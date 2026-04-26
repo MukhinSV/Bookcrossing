@@ -1,4 +1,5 @@
 from sqlalchemy import select, func, or_, and_
+from sqlalchemy.orm import selectinload
 
 from src.models.author import AuthorORM
 from src.models.book import BookORM
@@ -11,6 +12,16 @@ from src.repositories.base import BaseRepository
 class BookRepository(BaseRepository):
     model = BookORM
     schema = Book
+
+    async def get_main_page_books(self, limit: int = 9):
+        query = (
+            select(self.model)
+            .options(selectinload(self.model.author))
+            .limit(limit)
+        )
+        result = await self.session.execute(query)
+        models = result.scalars().all()
+        return [self.schema.model_validate(model) for model in models]
 
     async def search_paginated(
         self,

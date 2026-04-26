@@ -375,6 +375,44 @@
       showSideToast(type, message, timeoutMs);
     }
 
+    function renderMainDataUnavailable(message) {
+      booksGrid.innerHTML = "";
+      orgList.innerHTML = "";
+      booksEmpty.textContent = message;
+      orgEmpty.textContent = message;
+      booksEmpty.classList.remove("d-none");
+      orgEmpty.classList.remove("d-none");
+    }
+
+    async function fetchJsonWithRetry(url, options = {}, attempts = 2, timeoutMs = 5000) {
+      let lastError = null;
+
+      for (let attempt = 1; attempt <= attempts; attempt += 1) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+          const response = await fetch(url, {
+            ...options,
+            signal: controller.signal,
+          });
+          clearTimeout(timer);
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.detail ? String(data.detail) : "Ошибка загрузки");
+          }
+          return data;
+        } catch (error) {
+          clearTimeout(timer);
+          lastError = error;
+          if (attempt < attempts) {
+            await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+          }
+        }
+      }
+
+      throw lastError ?? new Error("Ошибка загрузки");
+    }
+
     function renderHeader(user) {
       if (!user) {
         headerActions.innerHTML = '<a href="/auth/login" class="btn btn-primary">Войти</a>';
@@ -489,23 +527,19 @@
     }
 
     async function loadMainData() {
-      // showResult("info", "Загрузка...", 0);
+      booksEmpty.classList.add("d-none");
+      orgEmpty.classList.add("d-none");
       try {
-        const response = await fetch("/main", {
+        const data = await fetchJsonWithRetry("/main", {
           method: "GET",
           headers: { "Accept": "application/json" }
         });
-        const data = await response.json();
-        if (!response.ok) {
-          // showResult("danger", data.detail ? String(data.detail) : "Ошибка загрузки главной страницы");
-          return;
-        }
         renderHeader(data.user ?? null);
         renderBooks(data.books ?? []);
         renderOrganisations(data.organisations ?? []);
-        // showResult("success", "Данные обновлены");
       } catch (error) {
-        // showResult("danger", "Не удалось загрузить данные");
+        renderHeader(null);
+        renderMainDataUnavailable("Не удалось загрузить данные. Попробуйте обновить страницу через несколько секунд.");
       }
     }
 
