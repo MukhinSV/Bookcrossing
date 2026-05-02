@@ -1,3 +1,5 @@
+from time import monotonic
+
 from sqlalchemy import select, func, or_, and_
 from sqlalchemy.orm import selectinload
 
@@ -12,11 +14,25 @@ from src.repositories.base import BaseRepository
 class BookRepository(BaseRepository):
     model = BookORM
     schema = Book
+    FILTER_CACHE_TTL_SECONDS = 300
+    _filter_cache_value: dict | None = None
+    _filter_cache_expires_at: float = 0
 
     async def get_main_page_books(self, limit: int = 9):
+        available_instance_exists = (
+            select(1)
+            .select_from(InstanceORM)
+            .where(
+                InstanceORM.book_id == self.model.id,
+                InstanceORM.status == "FREE",
+            )
+            .exists()
+        )
         query = (
             select(self.model)
             .options(selectinload(self.model.author))
+            .where(available_instance_exists)
+            .order_by(self.model.id.desc())
             .limit(limit)
         )
         result = await self.session.execute(query)
@@ -52,33 +68,33 @@ class BookRepository(BaseRepository):
             conditions.append(self.model.year >= year)
         if country:
             conditions.append(AuthorORM.country == country)
+
+        instance_conditions = [
+            InstanceORM.book_id == self.model.id,
+            InstanceORM.status == "FREE",
+        ]
         if address:
-            conditions.append(ExchangePointORM.address == address)
+            instance_conditions.append(ExchangePointORM.address == address)
+
+        available_instance_exists = (
+            select(1)
+            .select_from(InstanceORM)
+            .join(ExchangePointORM, ExchangePointORM.id == InstanceORM.exchange_point_id)
+            .where(*instance_conditions)
+            .exists()
+        )
 
         query = (
             select(self.model)
             .join(AuthorORM, self.model.author_id == AuthorORM.id)
-            .join(
-                InstanceORM,
-                and_(
-                    InstanceORM.book_id == self.model.id,
-                    InstanceORM.status == "FREE",
-                ),
-            )
-            .join(ExchangePointORM, ExchangePointORM.id == InstanceORM.exchange_point_id)
+            .options(selectinload(self.model.author))
+            .where(available_instance_exists)
         )
         count_query = (
-            select(func.count(func.distinct(self.model.id)))
+            select(func.count())
             .select_from(self.model)
             .join(AuthorORM, self.model.author_id == AuthorORM.id)
-            .join(
-                InstanceORM,
-                and_(
-                    InstanceORM.book_id == self.model.id,
-                    InstanceORM.status == "FREE",
-                ),
-            )
-            .join(ExchangePointORM, ExchangePointORM.id == InstanceORM.exchange_point_id)
+            .where(available_instance_exists)
         )
 
         if conditions:
@@ -87,7 +103,6 @@ class BookRepository(BaseRepository):
 
         query = (
             query
-            .distinct()
             .order_by(self.model.id.desc())
             .offset((page - 1) * per_page)
             .limit(per_page)
@@ -98,6 +113,10 @@ class BookRepository(BaseRepository):
         return [self.schema.model_validate(model) for model in models], total
 
     async def get_filter_values(self):
+        now = monotonic()
+        if self._filter_cache_value is not None and now < self._filter_cache_expires_at:
+            return self._filter_cache_value
+
         free_books_subquery = (
             select(func.distinct(self.model.id).label("book_id"))
             .select_from(self.model)
@@ -142,15 +161,20 @@ class BookRepository(BaseRepository):
         )
         addresses_result = await self.session.execute(
             select(ExchangePointORM.address)
+            .join(InstanceORM, InstanceORM.exchange_point_id == ExchangePointORM.id)
             .where(ExchangePointORM.address.is_not(None))
+            .where(InstanceORM.status == "FREE")
             .distinct()
             .order_by(ExchangePointORM.address.asc())
         )
 
-        return {
+        filters = {
             "genres": [value for value in genres_result.scalars().all() if value],
             "years": [value for value in years_result.scalars().all() if value is not None],
             "authors": [{"id": row.id, "fullname": row.fullname} for row in authors_result.all()],
             "countries": [value for value in countries_result.scalars().all() if value],
             "addresses": [value for value in addresses_result.scalars().all() if value],
         }
+        self.__class__._filter_cache_value = filters
+        self.__class__._filter_cache_expires_at = now + self.FILTER_CACHE_TTL_SECONDS
+        return filters

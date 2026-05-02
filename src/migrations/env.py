@@ -27,12 +27,18 @@ config = context.config
 
 DATABASE_URL = settings.DATABASE_URL.replace(
     "postgresql://",
-    "postgresql+asyncpg://"
+    "postgresql+asyncpg://",
+    1,
+).replace(
+    "postgres://",
+    "postgresql+asyncpg://",
+    1,
 )
+async_fallback_separator = "&" if "?" in DATABASE_URL else "?"
 
 config.set_main_option(
     "sqlalchemy.url",
-    f"{DATABASE_URL}?async_fallback=true",
+    f"{DATABASE_URL}{async_fallback_separator}async_fallback=true",
 )
 
 # Interpret the config file for Python logging.

@@ -14,6 +14,7 @@ from fastapi_cache.backends.redis import RedisBackend
 import sys
 from pathlib import Path
 
+from sqlalchemy import text
 from starlette.responses import HTMLResponse, FileResponse
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
@@ -24,6 +25,7 @@ from src.api.view import router as view_router
 from src.api.book import router as book_router
 from src.api.admin import router as admin_router
 from src.config import settings
+from src.database import engine
 from src.init import redis_manager
 
 logger = logging.getLogger(__name__)
@@ -91,6 +93,27 @@ def render_error_html(status_code: int, title: str, detail: str) -> HTMLResponse
 @app.get("/", summary="HTML главная страница", response_class=HTMLResponse)
 async def main_view_page():
     return FileResponse(INDEX_TEMPLATE_PATH)
+
+
+@app.get("/health", include_in_schema=False)
+async def health():
+    return {"status": "ok"}
+
+
+@app.get("/ready", include_in_schema=False)
+async def ready():
+    try:
+        async with engine.connect() as connection:
+            await connection.execute(text("SELECT 1"))
+        if redis_manager.redis is not None:
+            await redis_manager.redis.ping()
+    except Exception as exc:
+        logger.exception("Readiness check failed")
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "detail": exc.__class__.__name__},
+        )
+    return {"status": "ok"}
 
 
 @app.exception_handler(StarletteHTTPException)

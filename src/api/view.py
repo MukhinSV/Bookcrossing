@@ -1,4 +1,5 @@
 from pathlib import Path
+from time import monotonic
 
 from fastapi import APIRouter, Request
 from sqlalchemy import or_, select, func
@@ -14,6 +15,8 @@ from src.services.user import AuthService
 router = APIRouter(prefix="/main", tags=["Главная страница"])
 INDEX_TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "templates" / "index.html"
 SHELVES_TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "templates" / "shelves.html"
+SHELVES_CACHE_TTL_SECONDS = 60
+SHELVES_CACHE: dict[tuple[str | None, int, int], tuple[float, dict]] = {}
 
 @router.get("/view", summary="HTML главная страница", response_class=HTMLResponse)
 async def main_view_page():
@@ -49,6 +52,11 @@ async def shelves_page(db: DBDep, q: str | None = None, page: int = 1):
     page = max(page, 1)
     per_page = 10
     query = q.strip() if q else None
+    cache_key = (query, page, per_page)
+    cached = SHELVES_CACHE.get(cache_key)
+    now = monotonic()
+    if cached and cached[0] > now:
+        return cached[1]
 
     organisations_query = (
         select(ExchangePointORM, OrganisationORM)
@@ -83,10 +91,12 @@ async def shelves_page(db: DBDep, q: str | None = None, page: int = 1):
     total = (await db.session.execute(count_query)).scalar_one()
     total_pages = (total + per_page - 1) // per_page if total > 0 else 0
 
-    return {
+    response = {
         "items": organisations,
         "page": page,
         "per_page": per_page,
         "total": total,
         "total_pages": total_pages,
     }
+    SHELVES_CACHE[cache_key] = (now + SHELVES_CACHE_TTL_SECONDS, response)
+    return response

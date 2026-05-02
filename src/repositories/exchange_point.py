@@ -14,6 +14,7 @@ class ExchangePointRepository(BaseRepository):
         query = (
             select(self.model)
             .options(selectinload(self.model.organisation))
+            .order_by(self.model.id.asc())
             .limit(limit)
         )
         result = await self.session.execute(query)
