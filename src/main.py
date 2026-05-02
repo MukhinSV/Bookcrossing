@@ -1,4 +1,5 @@
 import uvicorn
+import logging
 from contextlib import asynccontextmanager
 from html import escape
 
@@ -24,6 +25,8 @@ from src.api.book import router as book_router
 from src.api.admin import router as admin_router
 from src.config import settings
 from src.init import redis_manager
+
+logger = logging.getLogger(__name__)
 
 
 class CachedImagesStaticFiles(StaticFiles):
@@ -111,6 +114,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled exception while processing %s %s", request.method, request.url.path)
     detail = "Внутренняя ошибка сервера"
     if wants_html(request):
         return render_error_html(500, "Ошибка сервера", detail)
