@@ -113,6 +113,55 @@ def normalize_payload(model, data: dict):
     return payload
 
 
+async def delete_user_with_dependencies(db: DBDep, user_id: int) -> bool:
+    user_exists = await db.user.get_one_or_none(id=user_id)
+    if not user_exists:
+        return False
+
+    user_booking_instance_ids = list(
+        (
+            await db.session.execute(
+                select(BookingORM.instance_id).where(BookingORM.user_id == user_id)
+            )
+        ).scalars().all()
+    )
+    if user_booking_instance_ids:
+        await db.session.execute(
+            update(InstanceORM)
+            .where(InstanceORM.id.in_(user_booking_instance_ids))
+            .values(status="FREE", user_id=None)
+        )
+
+    await db.session.execute(delete(BookingORM).where(BookingORM.user_id == user_id))
+
+    await db.session.execute(
+        update(InstanceORM)
+        .where(InstanceORM.user_id == user_id, InstanceORM.owner_id != user_id)
+        .values(user_id=None, status="FREE")
+    )
+
+    owned_instance_ids = list(
+        (
+            await db.session.execute(
+                select(InstanceORM.id).where(InstanceORM.owner_id == user_id)
+            )
+        ).scalars().all()
+    )
+    if owned_instance_ids:
+        await db.session.execute(
+            delete(BookingORM).where(BookingORM.instance_id.in_(owned_instance_ids))
+        )
+        await db.session.execute(
+            delete(InstanceORM).where(InstanceORM.id.in_(owned_instance_ids))
+        )
+
+    await db.session.execute(
+        delete(NewAddedInstanceORM).where(NewAddedInstanceORM.owner_id == user_id)
+    )
+    await db.session.execute(delete(UserORM).where(UserORM.id == user_id))
+    return True
+
+
 def column_type_name(column) -> str:
     try:
         return column.type.python_type.__name__
@@ -482,6 +531,13 @@ async def admin_table_delete(table_name: str, row_id: int, db: DBDep, request: R
     if not model:
         raise HTTPException(status_code=404, detail="Таблица не найдена")
     try:
+        if table_name == "user":
+            deleted = await delete_user_with_dependencies(db, row_id)
+            if not deleted:
+                await db.session.rollback()
+                raise HTTPException(status_code=404, detail="Запись не найдена")
+            await db.commit()
+            return {"status": "ok"}
         result = await db.session.execute(delete(model).where(model.id == row_id))
         if not result.rowcount:
             await db.session.rollback()
