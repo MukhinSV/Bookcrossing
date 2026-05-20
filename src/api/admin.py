@@ -4,6 +4,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Request
 from sqlalchemy import select, update, delete, func, or_
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from starlette.responses import HTMLResponse, FileResponse
 from fastapi_cache.decorator import cache
 
@@ -480,8 +481,21 @@ async def admin_table_delete(table_name: str, row_id: int, db: DBDep, request: R
     model = MODEL_MAP.get(table_name)
     if not model:
         raise HTTPException(status_code=404, detail="Таблица не найдена")
-    await db.session.execute(delete(model).where(model.id == row_id))
-    await db.commit()
+    try:
+        result = await db.session.execute(delete(model).where(model.id == row_id))
+        if not result.rowcount:
+            await db.session.rollback()
+            raise HTTPException(status_code=404, detail="Запись не найдена")
+        await db.commit()
+    except IntegrityError as exc:
+        await db.session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Нельзя удалить запись: на нее ссылаются связанные данные",
+        ) from exc
+    except SQLAlchemyError as exc:
+        await db.session.rollback()
+        raise HTTPException(status_code=500, detail="Не удалось удалить запись") from exc
     return {"status": "ok"}
 
 
