@@ -619,7 +619,7 @@
 
     async function downloadQrCode(bookId) {
       if (!bookId) {
-        showResult("danger", "У записи instance не указан book_id");
+        showResult("danger", "У записи book не указан id");
         return;
       }
       const url = buildBookQrUrl(bookId);
@@ -668,8 +668,8 @@
           <div class="d-flex justify-content-between align-items-center mb-2">
             <strong>${escapeHtml(getRecordTitle(item))}</strong>
             <div class="d-flex gap-2">
-              ${currentTable === "instance" ? `
-                <button class="btn btn-sm btn-outline-secondary js-download-qr" data-book-id="${item.book_id}">Получить QR-код</button>
+              ${currentTable === "book" ? `
+                <button class="btn btn-sm btn-outline-secondary js-download-qr" data-book-id="${item.id}">Получить QR-код</button>
               ` : ""}
               <button class="btn btn-sm btn-outline-primary js-save" data-id="${item.id}">Сохранить</button>
               <button class="btn btn-sm btn-outline-danger js-delete" data-id="${item.id}">Удалить</button>
