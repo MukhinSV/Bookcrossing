@@ -203,6 +203,22 @@ def build_table_filters(model, query: str | None):
     return or_(*conditions)
 
 
+def build_instance_filters(query: str | None):
+    if not query:
+        return None
+    q = query.strip()
+    if not q:
+        return None
+
+    conditions = [
+        BookORM.title.icontains(q),
+        ExchangePointORM.address.icontains(q),
+    ]
+    if q.isdigit():
+        conditions.append(InstanceORM.id == int(q))
+    return or_(*conditions)
+
+
 @router.get("/view", response_class=HTMLResponse, summary="HTML админка")
 async def admin_view_page(request: Request):
     get_admin_payload_or_404(request)
@@ -445,7 +461,20 @@ async def admin_table_get(
         raise HTTPException(status_code=404, detail="Таблица не найдена")
     query = select(model)
     count_query = select(func.count(model.id))
-    where_clause = build_table_filters(model, q)
+    if table_name == "instance":
+        query = (
+            query
+            .outerjoin(BookORM, InstanceORM.book_id == BookORM.id)
+            .outerjoin(ExchangePointORM, InstanceORM.exchange_point_id == ExchangePointORM.id)
+        )
+        count_query = (
+            count_query
+            .outerjoin(BookORM, InstanceORM.book_id == BookORM.id)
+            .outerjoin(ExchangePointORM, InstanceORM.exchange_point_id == ExchangePointORM.id)
+        )
+        where_clause = build_instance_filters(q)
+    else:
+        where_clause = build_table_filters(model, q)
     if where_clause is not None:
         query = query.where(where_clause)
         count_query = count_query.where(where_clause)

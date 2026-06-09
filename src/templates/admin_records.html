@@ -120,6 +120,12 @@
     let userOptions = [];
     let exchangePointOptions = [];
 
+    function updateSearchPlaceholder() {
+      qInput.placeholder = currentTable === "instance"
+        ? "Поиск по id, названию книги или адресу"
+        : "Поиск по полям";
+    }
+
     function showSideToast(type, message, timeoutMs = 4000) {
       const existingStack = document.getElementById("page-toast-stack");
       const stack = existingStack ?? (() => {
@@ -761,6 +767,7 @@
       userOptions = Array.isArray(data.users) ? data.users : [];
       exchangePointOptions = Array.isArray(data.exchange_points) ? data.exchange_points : [];
       currentTable = tableSelect.value || null;
+      updateSearchPlaceholder();
       renderCreateForm();
     }
 
@@ -783,6 +790,7 @@
     tableSelect.addEventListener("change", () => {
       currentTable = tableSelect.value;
       createForm.classList.add("d-none");
+      updateSearchPlaceholder();
       renderCreateForm();
       loadTable(1).catch((error) => showResult("danger", String(error.message || error)));
     });
