@@ -444,6 +444,10 @@
     function getRecordTitle(item) {
       const baseTitle = `id: ${item.id}`;
 
+      if (currentTable === "book") {
+        return item.title ? `${baseTitle} · Книга: ${item.title}` : baseTitle;
+      }
+
       if (currentTable !== "instance") {
         return baseTitle;
       }
